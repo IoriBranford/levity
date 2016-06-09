@@ -31,8 +31,8 @@ local function camera_set(camera, cx, cy, w, h)
 		local gh = love.graphics.getHeight()
 		camera.scale = math.min(gw/camera.w, gh/camera.h)
 	end
-	camera.x = (cx - camera.w / 2)
-	camera.y = (cy - camera.h / 2)
+	camera.x = math.floor(cx - camera.w / 2)
+	camera.y = math.floor(cy - camera.h / 2)
 end
 
 local function camera_zoom(camera, vz)
@@ -73,8 +73,8 @@ local function dynamicObjectLayer_update(self, dt)
 	for _, object in pairs(self.drawableobjects) do
 		local body = object.body
 		if body then
-			object.x = body:getX()
-			object.y = body:getY()
+			object.x = math.floor(body:getX())
+			object.y = math.floor(body:getY())
 			object.rotation = body:getAngle()
 		end
 
@@ -177,6 +177,7 @@ end
 
 function levity:loadNextMap()
 	love.audio.stop()
+	assert(self.nextmapfile, "Next map not set. In main.lua call levity:setNextMap to set the first map")
 	self.mapfile = self.nextmapfile
 
 	self.machine = scripting.newMachine()
@@ -260,15 +261,6 @@ function levity:loadNextMap()
 	self.map:box2d_init(self.world)
 
 	self.machine:newScript(self.mapfile, self.map.properties.script)
-
-	if self.map.width*self.map.tilewidth < self.camera.w then
-		self.camera:zoom(self.map.width*self.map.tilewidth
-					- self.camera.w)
-	end
-	if self.map.height*self.map.tileheight < self.camera.h then
-		self.camera:zoom(self.map.height*self.map.tileheight
-					- self.camera.h)
-	end
 
 	self.map:resize(self.camera.w, self.camera.h)
 	self.map.canvas:setFilter("linear", "linear")
@@ -613,20 +605,18 @@ function levity:draw()
 end
 
 function love.load()
-	local mapfile = "maps/stealth_proto2.lua"
-
 	for a, ar in ipairs(arg) do
 		if ar == "-debug" then
 			require("mobdebug").start()
 		else
 			local c1, c2 = ar:find("-map=")
 			if c1 == 1 then
-				mapfile = ar:sub(c2+1)
+				local mapfile = ar:sub(c2+1)
+				levity:setNextMap(mapfile)
 			end
 		end
 	end
 
-	levity:setNextMap(mapfile)
 	levity:loadNextMap()
 
 	--love.mouse.setRelativeMode(true)
