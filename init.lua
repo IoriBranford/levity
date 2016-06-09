@@ -4,7 +4,6 @@ local stats = require "levity.stats"
 
 local bit = require "bit"
 local sti = require "sti"
---local CollisionRules = require "CollisionRules"
 
 local FlipXBit = 0x80000000
 local FlipYBit = 0x40000000
@@ -259,23 +258,6 @@ function levity:loadNextMap()
 	end
 
 	self.map:box2d_init(self.world)
-	--for _, fixture in ipairs(self.map.box2d_collision.body:getFixtureList()) do
-	--	fixture:setCategory(CollisionRules.Category_Objects)
-	--end
-
-	local boundsshapes = {
-		love.physics.newEdgeShape(0, 0, 0, height),
-		love.physics.newEdgeShape(0, 0, width, 0),
-		love.physics.newEdgeShape(width, 0, width, height),
-		love.physics.newEdgeShape(0, height, width, height)
-	}
-
-	--local body = love.physics.newBody(self.world, 0, 0)
-
-	--for _, shape in ipairs(boundsshapes) do
-	--	local fixture = love.physics.newFixture(self.map.box2d_collision.body, shape)
-	--	fixture:setCategory(CollisionRules.Category_LevelBounds)
-	--end
 
 	self.machine:newScript(self.mapfile, self.map.properties.script)
 
@@ -418,7 +400,6 @@ function levity:setObjectGid(object, gid, bodytype, layer)
 			local fixture = love.physics.newFixture(
 						object.body, shape)
 			fixture:setSensor(shapeobj.properties.sensor == "true")
-			--fixture:setCategory(CollisionRules.Category_Objects)
 			local fixtureud = {
 				--id = shapeobj.id,
 				--need Tiled issue fixed:
@@ -478,7 +459,6 @@ function levity:addObject(object, layer, bodytype)
 			layer.properties.collidable == "true"
 		if shape and collidable then
 			local fixture = love.physics.newFixture(object.body, shape)
-			--fixture:setCategory(CollisionRules.Category_Objects)
 			fixture:setUserData(userdata)
 		end
 	end
