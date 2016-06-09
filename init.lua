@@ -45,6 +45,7 @@ end
 
 local function dynamicObject_updateAnimation(object, dt)
 	local animation = object.animation
+
 	local advanceframe = false
 	local looped = false
 	object.anitime = object.anitime + dt * 1000
@@ -208,6 +209,54 @@ function levity:loadNextMap()
 	end
 	if self.map.properties.gravity then
 		self.world:setGravity(0, tonumber(self.map.properties.gravity))
+	end
+
+	for _, tileset in ipairs(self.map.tilesets) do
+		local commonanimation = tileset.properties.commonanimation
+
+		if commonanimation then
+			commonanimation = tonumber(commonanimation)
+			local commonanimationtilegid =
+				tileset.firstgid + commonanimation
+			local commonanimationtile =
+				self.map.tiles[commonanimationtilegid]
+
+			commonanimation = commonanimationtile.animation or nil
+		end
+
+		local commoncollision = tileset.properties.commoncollision
+
+		if commoncollision then
+			commoncollision = tonumber(commoncollision)
+			local commoncollisiontilegid =
+				tileset.firstgid + commoncollision
+			local commoncollisiontile =
+				self.map.tiles[commoncollisiontilegid]
+
+			commoncollision = commoncollisiontile.objectGroup or nil
+		end
+
+		if commonanimation or commoncollision then
+			for i = tileset.firstgid, tileset.firstgid + tileset.tilecount - 1, 1 do
+				local tile = self.map.tiles[i]
+
+				if commonanimation and not tile.animation then
+					tile.animation = {}
+					for _, frame in ipairs(commonanimation) do
+						local tileid = tile.id + tonumber(frame.tileid)
+
+						table.insert(tile.animation, {
+							tileid = tostring(tileid),
+							duration = frame.duration
+						})
+					end
+				end
+
+				if commoncollision and not tile.objectGroup then
+					tile.objectGroup = commoncollision
+				end
+			end
+		end
 	end
 
 	for l = #self.map.layers, 1, -1 do
