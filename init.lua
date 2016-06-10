@@ -208,14 +208,13 @@ function levity:loadNextMap()
 		self.bank:load(self.map.properties.streamsounds, "stream")
 	end
 	if self.map.properties.gravity then
-		self.world:setGravity(0, tonumber(self.map.properties.gravity))
+		self.world:setGravity(0, self.map.properties.gravity)
 	end
 
 	for _, tileset in ipairs(self.map.tilesets) do
 		local commonanimation = tileset.properties.commonanimation
 
 		if commonanimation then
-			commonanimation = tonumber(commonanimation)
 			local commonanimationtilegid =
 				tileset.firstgid + commonanimation
 			local commonanimationtile =
@@ -227,7 +226,6 @@ function levity:loadNextMap()
 		local commoncollision = tileset.properties.commoncollision
 
 		if commoncollision then
-			commoncollision = tonumber(commoncollision)
 			local commoncollisiontilegid =
 				tileset.firstgid + commoncollision
 			local commoncollisiontile =
@@ -261,11 +259,11 @@ function levity:loadNextMap()
 
 	for l = #self.map.layers, 1, -1 do
 		local layer = self.map.layers[l]
-		local layerdynamic = (layer.properties.dynamic == "true")
+		local layerdynamic = (layer.properties.dynamic == true)
 		if not layerdynamic and layer.objects then
 			for _, object in ipairs(layer.objects) do
 				layerdynamic = layerdynamic or
-					(object.properties.dynamic == "true")
+					(object.properties.dynamic == true)
 				if layerdynamic then
 					break
 				end
@@ -292,7 +290,7 @@ function levity:loadNextMap()
 			for _, object in ipairs(objects) do
 				local bodytype
 				if layerdynamic
-				or (object.properties.dynamic == "true") then
+				or (object.properties.dynamic == true) then
 					if object.properties.dynamic ~= "false"
 					then
 						bodytype = "dynamic"
