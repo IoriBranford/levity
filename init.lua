@@ -192,6 +192,7 @@ function levity:loadNextMap()
 	self.camera = {
 		x = 0, y = 0,
 		w = love.graphics.getWidth(), h = love.graphics.getHeight(),
+		scale = 1,
 		set = camera_set,
 		zoom = camera_zoom
 	}
@@ -733,6 +734,13 @@ end
 
 function love.wheelmoved(x, y)
 	levity.machine:broadcast("wheelmoved", x, y)
+end
+
+function love.resize(w, h)
+	local camera = levity.camera
+	local gw = love.graphics.getWidth()
+	local gh = love.graphics.getHeight()
+	camera.scale = math.min(gw/camera.w, gh/camera.h)
 end
 
 function love.update(dt)
