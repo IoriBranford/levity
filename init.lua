@@ -32,8 +32,8 @@ local function camera_set(camera, cx, cy, w, h)
 		local gh = love.graphics.getHeight()
 		camera.scale = math.min(gw/camera.w, gh/camera.h)
 	end
-	camera.x = math.floor(cx - camera.w / 2)
-	camera.y = math.floor(cy - camera.h / 2)
+	camera.x = (cx - camera.w / 2)
+	camera.y = (cy - camera.h / 2)
 end
 
 local function camera_zoom(camera, vz)
@@ -75,8 +75,8 @@ local function dynamicObjectLayer_update(self, dt)
 	for _, object in pairs(self.drawableobjects) do
 		local body = object.body
 		if body then
-			object.x = math.floor(body:getX())
-			object.y = math.floor(body:getY())
+			object.x = (body:getX())
+			object.y = (body:getY())
 			object.rotation = body:getAngle()
 		end
 
@@ -313,8 +313,10 @@ function levity:loadNextMap()
 
 	self.machine:newScript(self.mapfile, self.map.properties.script)
 
-	self.map:resize(self.camera.w, self.camera.h)
-	--self.map.canvas:setFilter("linear", "linear")
+	local intscale = math.floor(self.camera.scale)
+	self.map:resize(self.camera.w * intscale,
+			self.camera.h * intscale)
+	self.map.canvas:setFilter("linear", "linear")
 	collectgarbage()
 	return self.map
 end
@@ -614,16 +616,18 @@ function levity:draw()
 	local cw, ch = self.camera.w, self.camera.h
 	local ccx, ccy = cx+cw/2, cy+ch/2
 
-	love.graphics.push()
-
-	love.graphics.translate(-cx, -cy)
+	local scale = self.camera.scale
+	local intscale = math.floor(scale)
 
 	self.map:setDrawRange(cx, cy, cw, ch)
 
 	local canvas = self.map.canvas
 	love.graphics.setCanvas(canvas)
 	love.graphics.clear(0, 0, 0, 1, canvas)
-
+	love.graphics.push()
+	love.graphics.translate(math.floor(-cx * intscale),
+				math.floor(-cy * intscale))
+	love.graphics.scale(intscale, intscale)
 	self.machine:call(self.mapfile, "beginDraw")
 	for _, layer in ipairs(self.map.layers) do
 		if layer.visible and layer.opacity > 0 then
@@ -631,7 +635,21 @@ function levity:draw()
 		end
 	end
 	self.machine:call(self.mapfile, "endDraw")
+	love.graphics.pop()
+	love.graphics.setCanvas()
+	self.stats:draw()
 
+	local canvasscale = scale / intscale
+	love.graphics.draw(canvas,
+				love.graphics.getWidth()/2,
+				love.graphics.getHeight()/2,
+				0, canvasscale, canvasscale,
+				canvas:getWidth()/2,
+				canvas:getHeight()/2)
+
+	love.graphics.push()
+	love.graphics.scale(scale, scale)
+	love.graphics.translate(-cx, -cy)
 	if self.drawbodies then
 		for i, body in ipairs(self.world:getBodyList()) do
 			if math.abs(body:getX() - ccx) < cw
@@ -656,19 +674,7 @@ function levity:draw()
 			end
 		end
 	end
-	--self.map:box2d_draw()
-
 	love.graphics.pop()
-
-	--self.stats:draw()
-
-	love.graphics.setCanvas()
-
-	local scale = self.camera.scale
-	love.graphics.draw(canvas,
-		love.graphics.getWidth()/2, love.graphics.getHeight()/2,
-		0, scale, scale,
-		canvas:getWidth()/2, canvas:getHeight()/2)
 end
 
 function love.load()

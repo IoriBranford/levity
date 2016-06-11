@@ -28,7 +28,12 @@ end
 
 function Stats:draw()
 	local font = love.graphics.getFont()
-	local width = love.graphics.getWidth() / 8
+	local width = love.graphics:getWidth()
+	local canvas = love.graphics.getCanvas()
+	if canvas then
+		width = canvas:getWidth()
+	end
+
 	love.graphics.printf(self.fps.."fps", 0, 0, width, "right")
 	love.graphics.printf(self.mem.." kb", 0, font:getHeight(),
 				width, "right")
