@@ -617,6 +617,9 @@ function levity:draw()
 	local cw, ch = self.camera.w, self.camera.h
 	local ccx, ccy = cx+cw/2, cy+ch/2
 
+	local gw = love.graphics.getWidth()
+	local gh = love.graphics.getHeight()
+	self.camera.scale = math.min(gw/self.camera.w, gh/self.camera.h)
 	local scale = self.camera.scale
 	local intscale = math.floor(scale)
 
@@ -734,13 +737,6 @@ end
 
 function love.wheelmoved(x, y)
 	levity.machine:broadcast("wheelmoved", x, y)
-end
-
-function love.resize(w, h)
-	local camera = levity.camera
-	local gw = love.graphics.getWidth()
-	local gh = love.graphics.getHeight()
-	camera.scale = math.min(gw/camera.w, gh/camera.h)
 end
 
 function love.update(dt)
