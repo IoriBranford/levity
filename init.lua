@@ -196,7 +196,6 @@ function levity:loadNextMap()
 		zoom = camera_zoom
 	}
 	self.stats = stats.newStats()
-	self.drawbodies = nil
 	self.nextmapfile = nil
 	collectgarbage()
 
