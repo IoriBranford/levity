@@ -15,6 +15,7 @@ local FlipYBit = 0x40000000
 -- @field bank
 -- @field camera
 -- @field stats
+-- @field drawbodies
 -- @field nextmapfile Will load and switch to this map on the next frame
 
 local levity = {}
@@ -137,6 +138,9 @@ local function dynamicObjectLayer_draw(self)
 				elseif shape:getType() == "polygon" then
 					love.graphics.polygon("line",
 					body:getWorldPoints(shape:getPoints()))
+				elseif shape:getType() == "chain" then
+					love.graphics.line(
+					body:getWorldPoints(shape:getPoints()))
 				end
 			end
 		end
@@ -192,6 +196,7 @@ function levity:loadNextMap()
 		zoom = camera_zoom
 	}
 	self.stats = stats.newStats()
+	self.drawbodies = nil
 	self.nextmapfile = nil
 	collectgarbage()
 
@@ -291,7 +296,7 @@ function levity:loadNextMap()
 				local bodytype
 				if layerdynamic
 				or (object.properties.dynamic == true) then
-					if object.properties.dynamic ~= "false"
+					if object.properties.dynamic ~= false
 					then
 						bodytype = "dynamic"
 					end
@@ -310,7 +315,7 @@ function levity:loadNextMap()
 	self.machine:newScript(self.mapfile, self.map.properties.script)
 
 	self.map:resize(self.camera.w, self.camera.h)
-	self.map.canvas:setFilter("linear", "linear")
+	--self.map.canvas:setFilter("linear", "linear")
 	collectgarbage()
 	return self.map
 end
@@ -484,6 +489,15 @@ function levity:addObject(object, layer, bodytype)
 			shape = love.physics.newCircleShape(
 				object.width / 2, object.height / 2,
 				(object.width + object.height) / 4)
+		elseif object.shape == "polyline" then
+			local points = {}
+			for _, point in ipairs(object.polyline) do
+				-- sti converts them to world points
+				table.insert(points, point.x - object.x)
+				table.insert(points, point.y - object.y)
+			end
+			shape = love.physics.newChainShape(
+				object.properties.loop or false, points)
 		end
 
 		object.body = love.physics.newBody(self.world, object.x, object.y, bodytype)
@@ -494,11 +508,13 @@ function levity:addObject(object, layer, bodytype)
 		}
 		object.body:setUserData(userdata)
 
-		local collidable = object.properties.collidable == "true" or
+		local collidable =
+			object.properties.collidable == "true" or
 			layer.properties.collidable == "true"
 		if shape and collidable then
 			local fixture = love.physics.newFixture(object.body, shape)
 			fixture:setUserData(userdata)
+			fixture:setSensor(object.properties.sensor == "true")
 		end
 	end
 
@@ -617,25 +633,30 @@ function levity:draw()
 	end
 	self.machine:call(self.mapfile, "endDraw")
 
-	--for i, body in ipairs(self.world:getBodyList()) do
-	--	if math.abs(body:getX() - ccx) < cw
-	--	and math.abs(body:getY() - ccy) < ch then
-	--		love.graphics.circle("line", body:getX(), body:getY(), 2)
-	--		for j, fixture in ipairs(body:getFixtureList()) do
-	--			local shape = fixture:getShape()
-	--			if shape:getType() == "circle" then
-	--				local x, y = body:getWorldPoint(
-	--					shape:getPoint())
-	--				love.graphics.circle("line", x, y,
-	--					shape:getRadius())
-	--				love.graphics.points(x, y)
-	--			elseif shape:getType() == "polygon" then
-	--				love.graphics.polygon("line",
-	--					body:getWorldPoints(shape:getPoints()))
-	--			end
-	--		end
-	--	end
-	--end
+	if self.drawbodies then
+		for i, body in ipairs(self.world:getBodyList()) do
+			if math.abs(body:getX() - ccx) < cw
+			and math.abs(body:getY() - ccy) < ch then
+				love.graphics.circle("line", body:getX(), body:getY(), 2)
+				for j, fixture in ipairs(body:getFixtureList()) do
+					local shape = fixture:getShape()
+					if shape:getType() == "circle" then
+						local x, y = body:getWorldPoint(
+							shape:getPoint())
+						love.graphics.circle("line", x, y,
+							shape:getRadius())
+						love.graphics.points(x, y)
+					elseif shape:getType() == "polygon" then
+						love.graphics.polygon("line",
+							body:getWorldPoints(shape:getPoints()))
+					elseif shape:getType() == "chain" then
+						love.graphics.line(
+							body:getWorldPoints(shape:getPoints()))
+					end
+				end
+			end
+		end
+	end
 	--self.map:box2d_draw()
 
 	love.graphics.pop()
