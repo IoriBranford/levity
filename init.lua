@@ -443,7 +443,7 @@ function levity:setObjectGid(object, gid, bodytype, layer)
 		if shape then
 			local fixture = love.physics.newFixture(
 						object.body, shape)
-			fixture:setSensor(shapeobj.properties.sensor == "true")
+			fixture:setSensor(shapeobj.properties.sensor == true)
 			local fixtureud = {
 				--id = shapeobj.id,
 				--need Tiled issue fixed:
@@ -509,12 +509,12 @@ function levity:addObject(object, layer, bodytype)
 		object.body:setUserData(userdata)
 
 		local collidable =
-			object.properties.collidable == "true" or
-			layer.properties.collidable == "true"
+			object.properties.collidable == true or
+			layer.properties.collidable == true
 		if shape and collidable then
 			local fixture = love.physics.newFixture(object.body, shape)
 			fixture:setUserData(userdata)
-			fixture:setSensor(object.properties.sensor == "true")
+			fixture:setSensor(object.properties.sensor == true)
 		end
 	end
 
