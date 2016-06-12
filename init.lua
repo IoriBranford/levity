@@ -738,9 +738,12 @@ end
 
 function love.resize(w, h)
 	local camera = levity.camera
-	local gw = love.graphics.getWidth()
-	local gh = love.graphics.getHeight()
-	camera.scale = math.min(gw/camera.w, gh/camera.h)
+	local scale = math.min(w/camera.w, h/camera.h)
+	local intscale = math.floor(scale)
+	if intscale ~= math.floor(camera.scale) then
+		levity.map:resize(camera.w * intscale, camera.h * intscale)
+	end
+	camera.scale = scale
 end
 
 function love.update(dt)
