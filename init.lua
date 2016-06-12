@@ -721,14 +721,23 @@ function love.touchreleased(touch, x, y, dx, dy, pressure)
 end
 
 function love.mousepressed(x, y, button, istouch)
+	if istouch then
+		return
+	end
 	levity.machine:broadcast("mousepressed", x, y, button, istouch)
 end
 
-function love.mousemoved(x, y, dx, dy)
+function love.mousemoved(x, y, dx, dy, istouch)
+	if istouch then
+		return
+	end
 	levity.machine:broadcast("mousemoved", x, y, dx, dy)
 end
 
 function love.mousereleased(x, y, button, istouch)
+	if istouch then
+		return
+	end
 	levity.machine:broadcast("mousereleased", x, y, button, istouch)
 end
 
