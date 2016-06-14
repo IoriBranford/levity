@@ -216,6 +216,11 @@ function levity:loadNextMap()
 		self.world:setGravity(0, self.map.properties.gravity)
 	end
 
+	for i = 1, #self.map.tilesets, 1 do
+		local tileset = self.map.tilesets[i]
+		self.map.tilesets[tileset.name] = tileset
+	end
+
 	for _, tileset in ipairs(self.map.tilesets) do
 		local commonanimation = tileset.properties.commonanimation
 
@@ -361,8 +366,16 @@ function levity:initPhysics()
 	self.world:setCallbacks(beginContact, endContact, preSolve, postSolve)
 end
 
+function levity:getMapTileset(tilesetid)
+	return self.map.tilesets[tilesetid]
+end
+
+function levity:getMapTileGid(tilesetid, tileid)
+	return tileid + self:getMapTileset(tilesetid).firstgid
+end
+
 function levity:getMapTile(tilesetid, tileid)
-	return self.map.tiles[tileid + self.map.tilesets[tilesetid].firstgid]
+	return self.map.tiles[self:getMapTileGid(tilesetid, tileid)]
 end
 
 function levity:getTilesetImage(tilesetid)
@@ -402,6 +415,7 @@ function levity:setObjectGid(object, gid, bodytype, layer)
 		fixtureschanged = true
 		object.body = love.physics.newBody(self.world,
 						object.x, object.y, bodytype)
+		object.body:setAngle(math.rad(object.rotation))
 		object.body:setUserData({
 			id = object.id,
 			object = object,
@@ -503,6 +517,7 @@ function levity:addObject(object, layer, bodytype)
 		end
 
 		object.body = love.physics.newBody(self.world, object.x, object.y, bodytype)
+		object.body:setAngle(math.rad(object.rotation))
 		local userdata = {
 			id = object.id,
 			object = object,
