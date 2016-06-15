@@ -393,11 +393,15 @@ end
 -- @see Object
 
 function levity:setObjectGid(object, gid, bodytype, layer)
-	local fixtureschanged = gid ~= object.gid
+	local newtile = self.map.tiles[self:getUnflippedGid(gid)]
+	local newtileset = self.map.tilesets[newtile.tileset]
+	local fixtureschanged = object.body == nil or
+		newtile.tileset ~= object.tile.tileset or
+		(newtileset.properties.commoncollision == nil and
+			gid ~= object.gid)
 
 	object.gid = gid
-	object.tile = self.map.tiles[self:getUnflippedGid(gid)]
-	local flipx, flipy = self:getGidFlip(gid)
+	object.tile = newtile
 
 	if object.tile.animation then
 		object.animation = object.tile.animation
@@ -410,9 +414,9 @@ function levity:setObjectGid(object, gid, bodytype, layer)
 			for _, fixture in ipairs(object.body:getFixtureList()) do
 				fixture:destroy()
 			end
+			object.body:getUserData().fixtures = nil
 		end
 	else
-		fixtureschanged = true
 		object.body = love.physics.newBody(self.world,
 						object.x, object.y, bodytype)
 		object.body:setAngle(math.rad(object.rotation))
@@ -434,6 +438,7 @@ function levity:setObjectGid(object, gid, bodytype, layer)
 		local shapecx = shapeobj.x + shapeobj.width/2
 		local shapecy = shapeobj.y + shapeobj.height/2
 
+		local flipx, flipy = self:getGidFlip(gid)
 		if flipx then
 			shapecx = tilewidth - shapecx
 		end
@@ -653,7 +658,6 @@ function levity:draw()
 	self.machine:call(self.mapfile, "endDraw")
 	love.graphics.pop()
 	love.graphics.setCanvas()
-	self.stats:draw()
 
 	local canvasscale = scale / intscale
 	love.graphics.draw(canvas,
@@ -691,6 +695,8 @@ function levity:draw()
 		end
 	end
 	love.graphics.pop()
+
+	self.stats:draw()
 end
 
 function love.load()
