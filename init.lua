@@ -436,19 +436,17 @@ function levity:setObjectGid(object, gid, bodytype, layer)
 
 	local function addFixture(shapeobj)
 		local shapecx = shapeobj.x + shapeobj.width/2
-		local shapecy = shapeobj.y + shapeobj.height/2
+		local shapecy = -tileheight + shapeobj.y + shapeobj.height/2
 
 		local flipx, flipy = self:getGidFlip(gid)
 		if flipx then
-			shapecx = tilewidth - shapecx
+			local ox = object.tile.offset.x + self.map.tilewidth
+			shapecx = 2 * ox + tilewidth - shapecx
 		end
 		if flipy then
-			shapecy = tileheight - shapecy
+			local oy = object.tile.offset.y
+			shapecy = 2 * oy + tileheight - shapecy
 		end
-
-		shapecx = shapecx + object.tile.offset.x + self.map.tilewidth
-							-- an sti issue
-		shapecy = shapecy + object.tile.offset.y
 
 		local shape
 		if shapeobj.shape == "rectangle" then
