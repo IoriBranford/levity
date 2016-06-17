@@ -20,11 +20,11 @@ end
 -- @param id A key by which to reference the script instance
 -- @param name Name of script
 -- @return The new script instance
-function Machine:newScript(id, name)
+function Machine:newScript(id, name, ...)
 	local script
 	if name then
 		local scriptclass = self:requireScript(name)
-		script = scriptclass(id)
+		script = scriptclass(id, ...)
 		self.scripts[id] = script
 	end
 	return script

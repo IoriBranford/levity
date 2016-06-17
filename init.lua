@@ -433,7 +433,8 @@ end
 -- @field destroy = true to destroy at end of update
 -- @see Object
 
-function levity:setObjectGid(object, gid, bodytype, layer)
+function levity:setObjectGid(object, gid, bodytype, layer, animated)
+	animated = animated or true
 	local newtile = self.map.tiles[self:getUnflippedGid(gid)]
 	local newtileset = self.map.tilesets[newtile.tileset]
 	local fixtureschanged = object.body == nil or
@@ -444,7 +445,7 @@ function levity:setObjectGid(object, gid, bodytype, layer)
 	object.gid = gid
 	object.tile = newtile
 
-	if object.tile.animation then
+	if animated and object.tile.animation then
 		object.animation = object.tile.animation
 		object.anitime = 0
 		object.aniframe = 1
