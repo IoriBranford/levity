@@ -216,12 +216,23 @@ function levity:loadNextMap()
 		self.world:setGravity(0, self.map.properties.gravity)
 	end
 
-	for i = 1, #self.map.tilesets, 1 do
-		local tileset = self.map.tilesets[i]
-		self.map.tilesets[tileset.name] = tileset
-	end
-
 	for _, tileset in ipairs(self.map.tilesets) do
+		self.map.tilesets[tileset.name] = tileset
+
+		tileset.tilecolumns =
+			math.floor(tileset.imagewidth / tileset.tilewidth)
+
+		tileset.rownames = {}
+		tileset.columnnames = {}
+
+		for p, v in pairs(tileset.properties) do
+			if string.find(p, "row_") == 1 then
+				tileset.rownames[v] = string.sub(p, 5)
+			elseif string.find(p, "column_") == 1 then
+				tileset.columnnames[v] = string.sub(p, 8)
+			end
+		end
+
 		local commonanimation = tileset.properties.commonanimation
 
 		if commonanimation then
@@ -230,7 +241,7 @@ function levity:loadNextMap()
 			local commonanimationtile =
 				self.map.tiles[commonanimationtilegid]
 
-			commonanimation = commonanimationtile.animation or nil
+			commonanimation = commonanimationtile.animation
 		end
 
 		local commoncollision = tileset.properties.commoncollision
@@ -241,7 +252,7 @@ function levity:loadNextMap()
 			local commoncollisiontile =
 				self.map.tiles[commoncollisiontilegid]
 
-			commoncollision = commoncollisiontile.objectGroup or nil
+			commoncollision = commoncollisiontile.objectGroup
 		end
 
 		if commonanimation or commoncollision then
@@ -364,6 +375,36 @@ function levity:initPhysics()
 	love.physics.setMeter(64)
 	self.world = love.physics.newWorld(0, 0)
 	self.world:setCallbacks(beginContact, endContact, preSolve, postSolve)
+end
+
+function levity:getTileGid(tilesetid, row, column)
+	local tileset = self.map.tilesets[tilesetid]
+
+	if type(column) == "string" then
+		column = tileset.properties["column_"..column]
+	end
+
+	if type(row) == "string" then
+		row = tileset.properties["row_"..row]
+	end
+
+	return tileset.firstgid + row * tileset.tilecolumns + column
+end
+
+function levity:getTileRowName(gid)
+	gid = self:getUnflippedGid(gid)
+	local tileset = self.map.tilesets[self.map.tiles[gid].tileset]
+	local tileid = gid - tileset.firstgid
+	local row = tileid / tileset.tilecolumns
+	return tileset.rownames[row]
+end
+
+function levity:getTileColumnName(gid)
+	gid = self:getUnflippedGid(gid)
+	local tileset = self.map.tilesets[self.map.tiles[gid].tileset]
+	local tileid = gid - tileset.firstgid
+	local column = tileid % tileset.tilecolumns
+	return tileset.columnnames[column]
 end
 
 function levity:getMapTileset(tilesetid)
