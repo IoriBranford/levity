@@ -32,14 +32,14 @@ local function camera_set(camera, cx, cy, w, h)
 		local gh = love.graphics.getHeight()
 		camera.scale = math.min(gw/camera.w, gh/camera.h)
 	end
-	camera.x = (cx - camera.w / 2)
-	camera.y = (cy - camera.h / 2)
+	camera.x = (cx - camera.w * .5)
+	camera.y = (cy - camera.h * .5)
 end
 
 local function camera_zoom(camera, vz)
 	local aspect = camera.w / camera.h
-	camera:set(camera.x - vz*aspect/2,
-		camera.y - vz/2,
+	camera:set(camera.x - vz*aspect*.5,
+		camera.y - vz*.5,
 		camera.w + vz*aspect,
 		camera.h + vz)
 end
@@ -87,11 +87,13 @@ local function dynamicObjectLayer_update(self, dt)
 end
 
 local function dynamicObjectLayer_draw(self)
+	local machine = levity.machine
 	local levitymaptilewidth = levity.map.tilewidth
 	local camw = levity.camera.w
 	local camh = levity.camera.h
-	local camcx = levity.camera.x + camw/2
-	local camcy = levity.camera.y + camh/2
+	local camcx = levity.camera.x + camw*.5
+	local camcy = levity.camera.y + camh*.5
+	local tilesets = levity.map.tilesets
 
 	local function draw(object)
 		if object.visible == false then
@@ -103,29 +105,29 @@ local function dynamicObjectLayer_draw(self)
 			return
 		end
 
-		levity.machine:call(object.id, "beginDraw")
+		machine:call(object.id, "beginDraw")
 
 		if object.tile then
 			local tile = object.tile
+			local tileset = tilesets[tile.tileset]
+			local x = object.x
+			local y = object.y
 			local ox = -tile.offset.x - levitymaptilewidth
 			-- an sti issue
 			local oy = -tile.offset.y
 			local sx, sy = 1, 1
 			local flipx, flipy = levity:getGidFlip(object.gid)
 			if flipx then
-				ox = ox + object.width
-				sx = -sx
+				ox = tileset.tilewidth - ox
+				sx = -1
 			end
 			if flipy then
-				oy = oy - object.height
-				sy = -sy
+				oy = tileset.tileheight - oy
+				sy = -1
 			end
 
-			love.graphics.draw(
-				levity:getTilesetImage(tile.tileset),
-				tile.quad,
-				object.x, object.y, object.rotation, sx, sy,
-				ox, oy)
+			love.graphics.draw(tileset.image, tile.quad, x, y,
+				object.rotation, sx, sy, ox, oy)
 		elseif object.body then
 			local body = object.body
 			for j, fixture in ipairs(body:getFixtureList()) do
@@ -155,17 +157,17 @@ local function dynamicObjectLayer_draw(self)
 				object.width, textalign, object.rotation)
 		end
 
-		levity.machine:call(object.id, "endDraw")
+		machine:call(object.id, "endDraw")
 	end
 
-	levity.machine:call(self.name, "beginDraw")
+	machine:call(self.name, "beginDraw")
 	love.graphics.push()
 	love.graphics.translate(self.offsetx, self.offsety)
 	for _, object in pairs(self.objects) do
 		draw(object)
 	end
 	love.graphics.pop()
-	levity.machine:call(self.name, "endDraw")
+	machine:call(self.name, "endDraw")
 end
 
 function levity:setNextMap(nextmapfile)
@@ -477,8 +479,8 @@ function levity:setObjectGid(object, gid, bodytype, layer, animated)
 	local tileheight = tileset.tileheight
 
 	local function addFixture(shapeobj)
-		local shapecx = shapeobj.x + shapeobj.width/2
-		local shapecy = -tileheight + shapeobj.y + shapeobj.height/2
+		local shapecx = shapeobj.x + shapeobj.width*.5
+		local shapecy = -tileheight + shapeobj.y + shapeobj.height*.5
 
 		local flipx, flipy = self:getGidFlip(gid)
 		if flipx then
@@ -498,7 +500,7 @@ function levity:setObjectGid(object, gid, bodytype, layer, animated)
 		elseif shapeobj.shape == "ellipse" then
 			shape = love.physics.newCircleShape(
 				shapecx, shapecy,
-				(shapeobj.width + shapeobj.height) / 4)
+				(shapeobj.width + shapeobj.height) * .25)
 		end
 
 		if shape then
@@ -544,12 +546,12 @@ function levity:addObject(object, layer, bodytype)
 	else
 		if object.shape == "rectangle" then
 			shape = love.physics.newRectangleShape(
-				object.width / 2, object.height / 2,
+				object.width * .5, object.height * .5,
 				object.width, object.height)
 		elseif object.shape == "ellipse" then
 			shape = love.physics.newCircleShape(
-				object.width / 2, object.height / 2,
-				(object.width + object.height) / 4)
+				object.width * .5, object.height * .5,
+				(object.width + object.height) * .25)
 		elseif object.shape == "polyline" then
 			local points = {}
 			for _, point in ipairs(object.polyline) do
@@ -675,7 +677,7 @@ function levity:draw()
 
 	local cx, cy = self.camera.x, self.camera.y
 	local cw, ch = self.camera.w, self.camera.h
-	local ccx, ccy = cx+cw/2, cy+ch/2
+	local ccx, ccy = cx+cw*.5, cy+ch*.5
 
 	local scale = self.camera.scale
 	local intscale = math.floor(scale)
@@ -686,8 +688,8 @@ function levity:draw()
 	love.graphics.setCanvas(canvas)
 	love.graphics.clear(0, 0, 0, 1, canvas)
 	love.graphics.push()
-	love.graphics.translate(math.floor(-cx * intscale),
-				math.floor(-cy * intscale))
+	love.graphics.translate(-math.floor(cx * intscale),
+				-math.floor(cy * intscale))
 	love.graphics.scale(intscale, intscale)
 	self.machine:call(self.mapfile, "beginDraw")
 	for _, layer in ipairs(self.map.layers) do
@@ -701,11 +703,11 @@ function levity:draw()
 
 	local canvasscale = scale / intscale
 	love.graphics.draw(canvas,
-				love.graphics.getWidth()/2,
-				love.graphics.getHeight()/2,
+				love.graphics.getWidth()*.5,
+				love.graphics.getHeight()*.5,
 				0, canvasscale, canvasscale,
-				canvas:getWidth()/2,
-				canvas:getHeight()/2)
+				canvas:getWidth()*.5,
+				canvas:getHeight()*.5)
 
 	love.graphics.push()
 	love.graphics.scale(scale, scale)
