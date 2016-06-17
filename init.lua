@@ -72,7 +72,7 @@ local function dynamicObject_updateAnimation(object, dt)
 end
 
 local function dynamicObjectLayer_update(self, dt)
-	for _, object in pairs(self.drawableobjects) do
+	for _, object in pairs(self.spriteobjects) do
 		local body = object.body
 		if body then
 			object.x = (body:getX())
@@ -84,6 +84,10 @@ local function dynamicObjectLayer_update(self, dt)
 			dynamicObject_updateAnimation(object, dt)
 		end
 	end
+
+	table.sort(self.objects, function(object1, object2)
+		return object1.y < object2.y
+	end)
 end
 
 local function dynamicObjectLayer_draw(self)
@@ -177,7 +181,7 @@ end
 --- @table DynamicLayer
 -- @field type "dynamiclayer"
 -- @field objects
--- @field drawableobjects
+-- @field spriteobjects
 -- @field update dynamicObjectLayer_update
 -- @field draw dynamicObjectLayer_draw
 -- @see ObjectLayer
@@ -306,7 +310,7 @@ function levity:loadNextMap()
 			layer.offsety = offsety
 			layer.properties = properties
 			layer.objects = {}
-			layer.drawableobjects = {}
+			layer.spriteobjects = {}
 			layer.update = dynamicObjectLayer_update
 			layer.draw = dynamicObjectLayer_draw
 
@@ -322,6 +326,9 @@ function levity:loadNextMap()
 				self:addObject(object, layer, bodytype)
 			end
 
+			table.sort(layer.objects, function(object1, object2)
+				return object1.y < object2.y
+			end)
 			self.map:setObjectData(layer)
 		end
 
@@ -414,11 +421,11 @@ function levity:getMapTileset(tilesetid)
 end
 
 function levity:getMapTileGid(tilesetid, tileid)
-	return tileid + self:getMapTileset(tilesetid).firstgid
+	return tileid + self.map.tilesets[tilesetid].firstgid
 end
 
 function levity:getMapTile(tilesetid, tileid)
-	return self.map.tiles[self:getMapTileGid(tilesetid, tileid)]
+	return self.map.tiles[tileid + self.map.tilesets[tilesetid].firstgid]
 end
 
 function levity:getTilesetImage(tilesetid)
@@ -542,7 +549,7 @@ function levity:addObject(object, layer, bodytype)
 	local shape = nil
 	if object.gid then
 		self:setObjectGid(object, object.gid, bodytype, layer)
-		table.insert(layer.drawableobjects, object)
+		table.insert(layer.spriteobjects, object)
 	else
 		if object.shape == "rectangle" then
 			shape = love.physics.newRectangleShape(
@@ -642,10 +649,10 @@ function levity:destroyObjects()
 					table.remove(layer.objects, o)
 				end
 			end
-			for o = #layer.drawableobjects, 1, -1 do
-				local object = layer.drawableobjects[o]
+			for o = #layer.spriteobjects, 1, -1 do
+				local object = layer.spriteobjects[o]
 				if object.destroy then
-					table.remove(layer.drawableobjects, o)
+					table.remove(layer.spriteobjects, o)
 				end
 			end
 		end
