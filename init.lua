@@ -303,16 +303,13 @@ function levity:loadNextMap()
 			local offsetx = layer.offsetx
 			local offsety = layer.offsety
 			local properties = layer.properties
+
 			self.map:removeLayer(l)
-			layer = self.map:addCustomLayer(name, l)
-			layer.type = "dynamiclayer"
+			layer = self:addDynamicLayer(name, l)
+
 			layer.offsetx = offsetx
 			layer.offsety = offsety
 			layer.properties = properties
-			layer.objects = {}
-			layer.spriteobjects = {}
-			layer.update = dynamicObjectLayer_update
-			layer.draw = dynamicObjectLayer_draw
 
 			for _, object in ipairs(objects) do
 				local bodytype
@@ -442,7 +439,7 @@ end
 -- @field destroy = true to destroy at end of update
 -- @see Object
 
-function levity:setObjectGid(object, gid, bodytype, layer, animated)
+function levity:setObjectGid(object, gid, animated, bodytype)
 	animated = animated or true
 	local newtile = self.map.tiles[self:getUnflippedGid(gid)]
 	local newtileset = self.map.tilesets[newtile.tileset]
@@ -466,6 +463,9 @@ function levity:setObjectGid(object, gid, bodytype, layer, animated)
 				fixture:destroy()
 			end
 			object.body:getUserData().fixtures = nil
+		end
+		if bodytype then
+			object.body:setType(bodytype)
 		end
 	else
 		object.body = love.physics.newBody(self.world,
@@ -548,8 +548,7 @@ function levity:addObject(object, layer, bodytype)
 
 	local shape = nil
 	if object.gid then
-		self:setObjectGid(object, object.gid, bodytype, layer)
-		table.insert(layer.spriteobjects, object)
+		self:setObjectGid(object, object.gid, true, bodytype)
 	else
 		if object.shape == "rectangle" then
 			shape = love.physics.newRectangleShape(
@@ -589,10 +588,48 @@ function levity:addObject(object, layer, bodytype)
 		end
 	end
 
+	self:addObjectToLayer(object, layer)
 	self.map.objects[object.id] = object
 	self.machine:newScript(object.id, object.properties.script)
+end
 
+function levity:addDynamicLayer(name, i)
+	local layer = self.map:addCustomLayer(name, i)
+	layer.type = "dynamiclayer"
+	layer.objects = {}
+	layer.spriteobjects = {}
+	layer.update = dynamicObjectLayer_update
+	layer.draw = dynamicObjectLayer_draw
+	layer.offsetx = 0
+	layer.offsety = 0
+	return layer
+end
+
+function levity:changeObjectLayer(object, layer)
+	function removeObject(objects, obj)
+		for i, o in ipairs(objects) do
+			if o == obj then
+				return table.remove(objects, i)
+			end
+		end
+	end
+
+	local oldlayer = object.layer
+	if oldlayer then
+		removeObject(oldlayer.objects, object)
+		if object.gid then
+			removeObject(oldlayer.spriteobjects, object)
+		end
+	end
+
+	self:addObjectToLayer(object, layer)
+end
+
+function levity:addObjectToLayer(object, layer)
 	table.insert(layer.objects, object)
+	if object.gid then
+		table.insert(layer.spriteobjects, object)
+	end
 end
 
 function levity:getGidFlip(gid)
