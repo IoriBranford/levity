@@ -541,6 +541,12 @@ function levity:setObjectGid(object, gid, animated, bodytype)
 end
 
 function levity:addObject(object, layer, bodytype)
+	if object.visible == nil then
+		object.visible = true
+	end
+	object.rotation = object.rotation or 0
+	object.properties = object.properties or {}
+
 	if not object.id then
 		object.id = self.map.nextobjectid
 		self.map.nextobjectid = self.map.nextobjectid + 1
@@ -630,6 +636,7 @@ function levity:addObjectToLayer(object, layer)
 	if object.gid then
 		table.insert(layer.spriteobjects, object)
 	end
+	object.layer = layer
 end
 
 function levity:getGidFlip(gid)
