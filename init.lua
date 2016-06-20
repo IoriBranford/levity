@@ -440,7 +440,6 @@ end
 -- @see Object
 
 function levity:setObjectGid(object, gid, animated, bodytype)
-	animated = animated or true
 	local newtile = self.map.tiles[self:getUnflippedGid(gid)]
 	local newtileset = self.map.tilesets[newtile.tileset]
 	local fixtureschanged = object.body == nil or
@@ -448,6 +447,9 @@ function levity:setObjectGid(object, gid, animated, bodytype)
 		(newtileset.properties.commoncollision == nil and
 			gid ~= object.gid)
 
+	if animated == nil then
+		animated = true
+	end
 	object.gid = gid
 	object.tile = newtile
 
@@ -455,6 +457,10 @@ function levity:setObjectGid(object, gid, animated, bodytype)
 		object.animation = object.tile.animation
 		object.anitime = 0
 		object.aniframe = 1
+	else
+		object.animation = nil
+		object.anitime = nil
+		object.aniframe = nil
 	end
 
 	if object.body then
