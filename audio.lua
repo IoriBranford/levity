@@ -10,7 +10,7 @@ end)
 -- @param soundlist Comma-separated list of audio files
 -- @param type "static" for sfx or "stream" for music/ambience (default "stream")
 function Bank:load(soundlist, type)
-	for soundfile in (soundlist..','):gmatch("(.-)"..',') do
+	for soundfile in (soundlist..','):gmatch("(.-),%s-") do
 		local sound = self.sounds[soundfile]
 		if not sound or sound:getType() ~= type then
 			if not love.filesystem.exists(soundfile) then
