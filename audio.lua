@@ -7,20 +7,31 @@ local Bank = class(function(self)
 end)
 
 --- Load list of audio files
--- @param soundlist Comma-separated list of audio files
+-- @param sounds Table or comma-separated audio file list
 -- @param type "static" for sfx or "stream" for music/ambience (default "stream")
-function Bank:load(soundlist, type)
-	for soundfile in (soundlist..','):gmatch("(.-),%s-") do
+function Bank:load(soundfiles, typ)
+	function load(soundfile)
 		local sound = self.sounds[soundfile]
-		if not sound or sound:getType() ~= type then
-			if not love.filesystem.exists(soundfile) then
+		if not sound or sound:getType() ~= typ then
+			if love.filesystem.exists(soundfile) then
+				sound = love.audio.newSource(soundfile, typ)
+				self.sounds[soundfile] = sound
+			else
 				print("WARNING: Missing sound file "..soundfile)
-				return
 			end
-			sound = love.audio.newSource(soundfile, type)
-			self.sounds[soundfile] = sound
 		end
 	end
+
+	if type(soundfiles) == "table" then
+		for _, soundfile in pairs(soundfiles) do
+			load(soundfile)
+		end
+	elseif type(soundfiles) == "string" then
+		for soundfile in (soundfiles..','):gmatch("(.-),%s-") do
+			load(soundfile)
+		end
+	end
+
 end
 
 --- Play an audio file
