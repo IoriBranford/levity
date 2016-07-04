@@ -2,8 +2,11 @@
 
 require "class"
 
+local MusicEmu = require "levity.MusicEmu"
+
 local Bank = class(function(self)
 	self.sounds = {}
+	self.emus = {}
 end)
 
 --- Load list of audio files
@@ -14,7 +17,13 @@ function Bank:load(soundfiles, typ)
 		local sound = self.sounds[soundfile]
 		if not sound or sound:getType() ~= typ then
 			if love.filesystem.exists(soundfile) then
-				sound = love.audio.newSource(soundfile, typ)
+				if typ == "emu" then
+					sound = MusicEmu(soundfile)
+					self.emus[soundfile] = sound
+				else
+					sound = love.audio.newSource(soundfile, typ)
+				end
+
 				self.sounds[soundfile] = sound
 			else
 				print("WARNING: Missing sound file "..soundfile)
@@ -37,11 +46,15 @@ end
 --- Play an audio file
 -- @param soundfile
 -- @return Sound source now playing the audio
-function Bank:play(soundfile)
+function Bank:play(soundfile, track)
 	local sound = self.sounds[soundfile]
 	local source = nil
 	if sound then
-		if sound:getType() == "stream" then
+		local typ = sound:getType()
+		if typ == "emu" then
+			sound:start(track)
+			source = sound
+		elseif typ == "stream" then
 			if sound:isPlaying() then
 				sound:rewind()
 			else
@@ -54,6 +67,12 @@ function Bank:play(soundfile)
 		end
 	end
 	return source
+end
+
+function Bank:update()
+	for _, emu in pairs(self.emus) do
+		emu:update()
+	end
 end
 
 local audio = {

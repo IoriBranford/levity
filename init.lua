@@ -716,6 +716,8 @@ function levity:update(dt)
 
 	self.map:update(dt)
 
+	self.bank:update()
+
 	self:destroyObjects()
 	collectgarbage("step", 1)
 
