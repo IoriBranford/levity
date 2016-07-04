@@ -258,8 +258,6 @@ end
 
 function MusicEmu:start(track)
 	lib.gme_start_track(self.musicemu, track or 0)
-	self:update()
-	self.source:play()
 end
 
 function MusicEmu:getTrackInfo(track)
@@ -270,14 +268,16 @@ end
 
 function MusicEmu:update()
 	self.source:step()
-	local sounddata
 	while self.source:getFreeBufferCount() > 0 do
-		sounddata = love.sound.newSoundData(self.buffersamples,
-							self.rate)
-		lib.gme_play(self.musicemu, sounddata:getSize()*.5,
-				sounddata:getPointer())
-		self.source:queue(sounddata)
+		lib.gme_play(self.musicemu, self.sounddata:getSize()*.5,
+				self.sounddata:getPointer())
+		self.source:queue(self.sounddata)
+		self.source:play()
 	end
+end
+
+function MusicEmu:unpause()
+	self.source:play()
 end
 
 function MusicEmu:pause()
@@ -315,6 +315,7 @@ function newMusicEmu(filename, buffersamples, rate)
 				self.rate)
 	self.musicemu = musicemu[0]
 	self.source = QueueableSource:new(2)
+	self.sounddata = love.sound.newSoundData(self.buffersamples, self.rate)
 	return self
 end
 
