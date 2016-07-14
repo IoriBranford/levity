@@ -6,7 +6,8 @@ local MusicEmu = require "levity.MusicEmu"
 
 local Bank = class(function(self)
 	self.sounds = {}
-	self.emus = {}
+	self.currentmusic = nil
+	self.nextmusicfile = nil
 end)
 
 --- Load list of audio files
@@ -19,7 +20,6 @@ function Bank:load(soundfiles, typ)
 			if love.filesystem.exists(soundfile) then
 				if typ == "emu" then
 					sound = MusicEmu(soundfile)
-					self.emus[soundfile] = sound
 				else
 					sound = love.audio.newSource(soundfile, typ)
 				end
@@ -54,6 +54,7 @@ function Bank:play(soundfile, track)
 		if typ == "emu" then
 			sound:start(track)
 			source = sound
+			self.currentmusic = source
 		elseif typ == "stream" then
 			if sound:isPlaying() then
 				sound:rewind()
@@ -70,8 +71,33 @@ function Bank:play(soundfile, track)
 end
 
 function Bank:update()
-	for _, emu in pairs(self.emus) do
-		emu:update()
+	if self.currentmusic then
+		if self.currentmusic.update then
+			self.currentmusic:update()
+		end
+
+		if not self.currentmusic:isPlaying() then
+			if self.nextmusicfile then
+				self.currentmusic = self:play(self.nextmusicfile)
+			else
+				self.currentmusic = nil
+			end
+			self.nextmusicfile = nil
+		end
+	end
+end
+
+function Bank:changeMusic(nextfile, nextfiletype, fade)
+	self:load(nextfile, nextfiletype)
+
+	if fade and self.currentmusic and self.currentmusic.fade then
+		self.currentmusic:fade()
+		self.nextmusicfile = nextfile
+	else
+		if self.currentmusic then
+			self.currentmusic:pause()
+		end
+		self.currentmusic = self:play(nextfile)
 	end
 end
 

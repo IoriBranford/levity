@@ -804,6 +804,7 @@ function love.load()
 	for a, ar in ipairs(arg) do
 		if ar == "-debug" then
 			require("mobdebug").start()
+			require("mobdebug").off()
 		else
 			local c1, c2 = ar:find("-map=")
 			if c1 == 1 then

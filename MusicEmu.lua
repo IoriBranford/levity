@@ -268,6 +268,7 @@ end
 
 function MusicEmu:update()
 	self.source:step()
+
 	while self.source:getFreeBufferCount() > 0 do
 		lib.gme_play(self.musicemu, self.sounddata:getSize()*.5,
 				self.sounddata:getPointer())
@@ -292,8 +293,8 @@ function MusicEmu:fade()
 	lib.gme_set_fade(self.musicemu, lib.gme_tell(self.musicemu))
 end
 
-function MusicEmu:trackEnded()
-	return lib.gme_track_ended(self.musicemu) > 0
+function MusicEmu:isPlaying()
+	return lib.gme_track_ended(self.musicemu) == 0
 end
 
 function newMusicEmu(filename, buffersamples, rate)
