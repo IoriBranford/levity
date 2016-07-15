@@ -286,16 +286,7 @@ function levity:loadNextMap()
 
 	for l = #self.map.layers, 1, -1 do
 		local layer = self.map.layers[l]
-		local layerdynamic = (layer.properties.dynamic == true)
-		if not layerdynamic and layer.objects then
-			for _, object in ipairs(layer.objects) do
-				layerdynamic = layerdynamic or
-					(object.properties.dynamic == true)
-				if layerdynamic then
-					break
-				end
-			end
-		end
+		local layerdynamic = not layer.properties.static
 
 		if layer.objects and layerdynamic then
 			local name = layer.name
@@ -313,12 +304,8 @@ function levity:loadNextMap()
 
 			for _, object in ipairs(objects) do
 				local bodytype
-				if layerdynamic
-				or (object.properties.dynamic == true) then
-					if object.properties.dynamic ~= false
-					then
-						bodytype = "dynamic"
-					end
+				if not object.properties.static then
+					bodytype = "dynamic"
 				end
 				self:addObject(object, layer, bodytype)
 			end
@@ -436,7 +423,7 @@ end
 -- @field animation
 -- @field anitime in milliseconds
 -- @field aniframe
--- @field destroy = true to destroy at end of update
+-- @field dead = true to destroy at end of update
 -- @see Object
 
 function levity:setObjectGid(object, gid, animated, bodytype)
@@ -686,7 +673,7 @@ function levity:destroyObjects()
 		if layer.type == "dynamiclayer" and layer.objects then
 			for o = #layer.objects, 1, -1 do
 				local object = layer.objects[o]
-				if object.destroy then
+				if object.dead then
 					if object.body then
 						object.body:destroy()
 					end
@@ -701,7 +688,7 @@ function levity:destroyObjects()
 			end
 			for o = #layer.spriteobjects, 1, -1 do
 				local object = layer.spriteobjects[o]
-				if object.destroy then
+				if object.dead then
 					table.remove(layer.spriteobjects, o)
 				end
 			end
@@ -716,7 +703,7 @@ function levity:update(dt)
 
 	self.map:update(dt)
 
-	self.bank:update()
+	self.bank:update(dt)
 
 	self:destroyObjects()
 	collectgarbage("step", 1)

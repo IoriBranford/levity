@@ -7,6 +7,7 @@ local MusicEmu = require "levity.MusicEmu"
 local Bank = class(function(self)
 	self.sounds = {}
 	self.currentmusic = nil
+	self.timetonextmusic = 0
 	self.nextmusicfile = nil
 end)
 
@@ -70,28 +71,28 @@ function Bank:play(soundfile, track)
 	return source
 end
 
-function Bank:update()
+function Bank:update(dt)
 	if self.currentmusic then
 		if self.currentmusic.update then
 			self.currentmusic:update()
 		end
 
-		if not self.currentmusic:isPlaying() then
-			if self.nextmusicfile then
+		if self.timetonextmusic > 0 then
+			self.timetonextmusic = self.timetonextmusic - dt
+			if self.timetonextmusic <= 0 then
 				self.currentmusic = self:play(self.nextmusicfile)
-			else
-				self.currentmusic = nil
+				self.nextmusicfile = nil
 			end
-			self.nextmusicfile = nil
 		end
 	end
 end
 
-function Bank:changeMusic(nextfile, nextfiletype, fade)
+function Bank:changeMusic(nextfile, nextfiletype, fadetime)
 	self:load(nextfile, nextfiletype)
 
-	if fade and self.currentmusic and self.currentmusic.fade then
+	if fadetime and self.currentmusic and self.currentmusic.fade then
 		self.currentmusic:fade()
+		self.timetonextmusic = fadetime
 		self.nextmusicfile = nextfile
 	else
 		if self.currentmusic then
