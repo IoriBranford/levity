@@ -153,10 +153,17 @@ local function dynamicObjectLayer_draw(self)
 
 		local text = object.properties.text
 		if text then
+			local textfont = object.properties.textfont
+			if textfont then
+				textfont = tilesets[textfont].properties.font
+				love.graphics.setFont(textfont)
+			end
+
 			local textalign = object.properties.textalign
 			if not textalign then
 				textalign = "center"
 			end
+
 			love.graphics.printf(text, object.x, object.y, 
 				object.width, textalign, object.rotation)
 		end
@@ -281,6 +288,12 @@ function levity:loadNextMap()
 					tile.objectGroup = commoncollision
 				end
 			end
+		end
+
+		if tileset.properties.font then
+			tileset.properties.font =
+				love.graphics.newImageFont(tileset.image,
+					tileset.properties.fontglyphs)
 		end
 	end
 
@@ -734,8 +747,8 @@ function levity:draw()
 	love.graphics.setCanvas(canvas)
 	love.graphics.clear(0, 0, 0, 1, canvas)
 	love.graphics.push()
-	love.graphics.translate(-math.floor(cx * intscale),
-				-math.floor(cy * intscale))
+	love.graphics.translate(-(cx * intscale),
+				-(cy * intscale))
 	love.graphics.scale(intscale, intscale)
 	self.machine:call(self.mapfile, "beginDraw")
 	for _, layer in ipairs(self.map.layers) do
