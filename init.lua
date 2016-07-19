@@ -32,8 +32,8 @@ local function camera_set(camera, cx, cy, w, h)
 		local gh = love.graphics.getHeight()
 		camera.scale = math.min(gw/camera.w, gh/camera.h)
 	end
-	camera.x = (cx - camera.w * .5)
-	camera.y = (cy - camera.h * .5)
+	camera.x = math.floor(cx - camera.w * .5)
+	camera.y = math.floor(cy - camera.h * .5)
 end
 
 local function camera_zoom(camera, vz)
