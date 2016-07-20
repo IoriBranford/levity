@@ -1,4 +1,11 @@
 local ffi = require "ffi"
+
+local ok, lib = pcall(ffi.load, "libgme")
+if not ok then
+	print(lib)
+	return false
+end
+
 local QueueableSource = require "levity.QueueableSource"
 
 ffi.cdef[[
@@ -235,8 +242,6 @@ typedef void (*gme_user_cleanup_t)( void* user_data );
 void gme_set_user_cleanup( Music_Emu*, gme_user_cleanup_t func );
 
 ]]
-
-local lib = ffi.load("libgme")
 
 ffi.metatype("Music_Emu", {
 	__gc = function(musicemu)

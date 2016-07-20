@@ -20,7 +20,9 @@ function Bank:load(soundfiles, typ)
 		if not sound or sound:getType() ~= typ then
 			if love.filesystem.exists(soundfile) then
 				if typ == "emu" then
-					sound = MusicEmu(soundfile)
+					if MusicEmu then
+						sound = MusicEmu(soundfile)
+					end
 				else
 					sound = love.audio.newSource(soundfile, typ)
 				end
