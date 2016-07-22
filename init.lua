@@ -3,10 +3,12 @@ local audio = require "levity.audio"
 local stats = require "levity.stats"
 
 local bit = require "bit"
-local sti = require "sti"
+local sti = require "sti.sti"
 
 local FlipXBit = 0x80000000
 local FlipYBit = 0x40000000
+
+local MaxIntScale = 4
 
 --- @table levity
 -- @field machine
@@ -92,7 +94,6 @@ end
 
 local function dynamicObjectLayer_draw(self)
 	local machine = levity.machine
-	local levitymaptilewidth = levity.map.tilewidth
 	local camw = levity.camera.w
 	local camh = levity.camera.h
 	local camcx = levity.camera.x + camw*.5
@@ -116,9 +117,8 @@ local function dynamicObjectLayer_draw(self)
 			local tileset = tilesets[tile.tileset]
 			local x = object.x
 			local y = object.y
-			local ox = -tile.offset.x - levitymaptilewidth
-			-- an sti issue
-			local oy = -tile.offset.y
+			local ox = -tile.offset.x
+			local oy = -tile.offset.y + tileset.tileheight
 			local sx, sy = 1, 1
 			local flipx, flipy = levity:getGidFlip(object.gid)
 			if flipx then
@@ -215,7 +215,7 @@ function levity:loadNextMap()
 
 	self:initPhysics()
 
-	self.map = sti.new(self.mapfile, {"box2d"})
+	self.map = sti(self.mapfile, {"box2d"})
 	local width = self.map.width * self.map.tilewidth
 	local height = self.map.height * self.map.tileheight
 
@@ -336,7 +336,7 @@ function levity:loadNextMap()
 
 	self.machine:newScript(self.mapfile, self.map.properties.script)
 
-	local intscale = math.floor(self.camera.scale)
+	local intscale = math.min(math.floor(self.camera.scale), MaxIntScale)
 	self.map:resize(self.camera.w * intscale,
 			self.camera.h * intscale)
 	self.map.canvas:setFilter("linear", "linear")
@@ -497,7 +497,7 @@ function levity:setObjectGid(object, gid, animated, bodytype)
 
 		local flipx, flipy = self:getGidFlip(gid)
 		if flipx then
-			local ox = object.tile.offset.x + self.map.tilewidth
+			local ox = object.tile.offset.x
 			shapecx = 2 * ox + tilewidth - shapecx
 		end
 		if flipy then
@@ -739,7 +739,7 @@ function levity:draw()
 	local ccx, ccy = cx+cw*.5, cy+ch*.5
 
 	local scale = self.camera.scale
-	local intscale = math.floor(scale)
+	local intscale = math.min(math.floor(scale), MaxIntScale)
 
 	self.map:setDrawRange(cx, cy, cw, ch)
 
@@ -772,26 +772,30 @@ function levity:draw()
 	love.graphics.scale(scale, scale)
 	love.graphics.translate(-cx, -cy)
 	if self.drawbodies then
-		for i, body in ipairs(self.world:getBodyList()) do
-			if math.abs(body:getX() - ccx) < cw
-			and math.abs(body:getY() - ccy) < ch then
-				love.graphics.circle("line", body:getX(), body:getY(), 2)
-				for j, fixture in ipairs(body:getFixtureList()) do
-					local shape = fixture:getShape()
-					if shape:getType() == "circle" then
-						local x, y = body:getWorldPoint(
-							shape:getPoint())
-						love.graphics.circle("line", x, y,
-							shape:getRadius())
-						love.graphics.points(x, y)
-					elseif shape:getType() == "polygon" then
-						love.graphics.polygon("line",
-							body:getWorldPoints(shape:getPoints()))
-					elseif shape:getType() == "chain" then
-						love.graphics.line(
-							body:getWorldPoints(shape:getPoints()))
-					end
-				end
+		local fixtures = {}
+		self.world:queryBoundingBox(cx, cy, cx+cw, cy+ch,
+		function(fixture)
+			table.insert(fixtures, fixture)
+			return true
+		end)
+
+		for _, fixture in ipairs(fixtures) do
+			local body = fixture:getBody()
+			love.graphics.circle("line", body:getX(), body:getY(), 1)
+
+			local shape = fixture:getShape()
+			if shape:getType() == "circle" then
+				local x, y = body:getWorldPoint(
+					shape:getPoint())
+				love.graphics.circle("line", x, y,
+					shape:getRadius())
+				love.graphics.points(x, y)
+			elseif shape:getType() == "polygon" then
+				love.graphics.polygon("line",
+					body:getWorldPoints(shape:getPoints()))
+			elseif shape:getType() == "chain" then
+				love.graphics.line(
+					body:getWorldPoints(shape:getPoints()))
 			end
 		end
 	end
@@ -871,7 +875,7 @@ end
 function love.resize(w, h)
 	local camera = levity.camera
 	local scale = math.min(w/camera.w, h/camera.h)
-	local intscale = math.floor(scale)
+	local intscale = math.min(math.floor(scale), MaxIntScale)
 	if intscale ~= math.floor(camera.scale) then
 		levity.map:resize(camera.w * intscale, camera.h * intscale)
 	end
