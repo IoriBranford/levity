@@ -818,9 +818,9 @@ function love.load()
 		end
 	end
 
+	love.joystick.loadGamepadMappings("gamecontrollerdb.txt")
 	levity:loadNextMap()
 
-	--love.mouse.setRelativeMode(true)
 	love.mouse.setVisible(false)
 	love.graphics.setNewFont(18)
 end
@@ -845,6 +845,30 @@ end
 
 function love.touchreleased(touch, x, y, dx, dy, pressure)
 	levity.machine:broadcast("touchreleased", touch, x, y, dx, dy)
+end
+
+function love.joystickaxis(joystick, axis, value)
+	levity.machine:broadcast("joystickaxis", joystick, axis, value)
+end
+
+function love.joystickpressed(joystick, button)
+	levity.machine:broadcast("joystickpressed", joystick, button)
+end
+
+function love.joystickreleased(joystick, button)
+	levity.machine:broadcast("joystickreleased", joystick, button)
+end
+
+function love.gamepadaxis(joystick, axis, value)
+	levity.machine:broadcast("gamepadaxis", joystick, axis, value)
+end
+
+function love.gamepadpressed(joystick, button)
+	levity.machine:broadcast("gamepadpressed", joystick, button)
+end
+
+function love.gamepadreleased(joystick, button)
+	levity.machine:broadcast("gamepadreleased", joystick, button)
 end
 
 function love.mousepressed(x, y, button, istouch)
