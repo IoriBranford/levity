@@ -818,7 +818,7 @@ function love.load()
 		end
 	end
 
-	love.joystick.loadGamepadMappings("gamecontrollerdb.txt")
+	love.joystick.loadGamepadMappings("levity/gamecontrollerdb.txt")
 	levity:loadNextMap()
 
 	love.mouse.setVisible(false)
