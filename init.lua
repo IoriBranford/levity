@@ -51,7 +51,7 @@ local function dynamicObject_updateAnimation(object, dt)
 
 	local advanceframe = false
 	local looped = false
-	object.anitime = object.anitime + dt * 1000
+	object.anitime = object.anitime + dt * 1000 * object.anitimescale
 	while object.anitime > tonumber(animation[object.aniframe].duration) do
 		advanceframe = true
 		object.anitime  = object.anitime -
@@ -161,7 +161,7 @@ local function dynamicObjectLayer_draw(self)
 
 			local textalign = object.properties.textalign
 			if not textalign then
-				textalign = "center"
+				textalign = "left"
 			end
 
 			love.graphics.printf(text, object.x, object.y, 
@@ -385,6 +385,9 @@ end
 
 function levity:getTileGid(tilesetid, row, column)
 	local tileset = self.map.tilesets[tilesetid]
+	if not tileset then
+		return nil
+	end
 
 	if type(column) == "string" then
 		column = tileset.properties["column_"..column]
@@ -392,6 +395,10 @@ function levity:getTileGid(tilesetid, row, column)
 
 	if type(row) == "string" then
 		row = tileset.properties["row_"..row]
+	end
+
+	if not column or not row then
+		return nil
 	end
 
 	return tileset.firstgid + row * tileset.tilecolumns + column
@@ -435,6 +442,7 @@ end
 -- @field tile Can be different from gid while animating
 -- @field animation
 -- @field anitime in milliseconds
+-- @field anitimescale
 -- @field aniframe
 -- @field dead = true to destroy at end of update
 -- @see Object
@@ -456,10 +464,12 @@ function levity:setObjectGid(object, gid, animated, bodytype)
 	if animated and object.tile.animation then
 		object.animation = object.tile.animation
 		object.anitime = 0
+		object.anitimescale = 1
 		object.aniframe = 1
 	else
 		object.animation = nil
 		object.anitime = nil
+		object.anitimescale = nil
 		object.aniframe = nil
 	end
 
