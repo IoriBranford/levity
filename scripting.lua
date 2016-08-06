@@ -1,6 +1,6 @@
 -- @module scripting
 
-require "class"
+require "levity.class"
 
 local Machine = class(function(self)
 	self.scripts = {}

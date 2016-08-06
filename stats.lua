@@ -1,4 +1,4 @@
-require "class"
+require "levity.class"
 
 local Stats = class(function(self)
 	self:reset()

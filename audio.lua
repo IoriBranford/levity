@@ -1,6 +1,6 @@
 --- @module audio
 
-require "class"
+require "levity.class"
 
 local MusicEmu = require "levity.MusicEmu"
 
