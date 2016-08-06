@@ -1,3 +1,7 @@
+require "levity.xcoroutine"
+require "levity.xmath"
+require "levity.class"
+
 local scripting = require "levity.scripting"
 local audio = require "levity.audio"
 local stats = require "levity.stats"
