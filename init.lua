@@ -22,6 +22,7 @@ local MaxIntScale = 4
 -- @field camera
 -- @field stats
 -- @field drawbodies
+-- @field mappaused
 -- @field nextmapfile Will load and switch to this map on the next frame
 
 local levity = {}
@@ -203,6 +204,9 @@ function levity:loadNextMap()
 	self.mapfile = self.nextmapfile
 
 	self.machine = scripting.newMachine()
+	if self.world then
+		self.world:destroy()
+	end
 	self.world = nil
 	self.map = nil
 	self.bank = audio.newBank()
@@ -345,6 +349,8 @@ function levity:loadNextMap()
 			self.camera.h * intscale)
 	self.map.canvas:setFilter("linear", "linear")
 	collectgarbage()
+
+	self.mappaused = false
 	return self.map
 end
 
@@ -724,11 +730,17 @@ function levity:destroyObjects()
 end
 
 function levity:update(dt)
-	self.machine:broadcast("beginMove", dt)
-	self.world:update(dt)
-	self.machine:broadcast("endMove", dt)
+	if self.nextmapfile then
+		self:loadNextMap()
+	end
 
-	self.map:update(dt)
+	if not self.mappaused then
+		self.machine:broadcast("beginMove", dt)
+		self.world:update(dt)
+		self.machine:broadcast("endMove", dt)
+
+		self.map:update(dt)
+	end
 
 	self.bank:update(dt)
 
@@ -736,10 +748,6 @@ function levity:update(dt)
 	collectgarbage("step", 1)
 
 	self.stats:update(dt)
-
-	if self.nextmapfile then
-		self:loadNextMap()
-	end
 end
 
 function levity:draw()
