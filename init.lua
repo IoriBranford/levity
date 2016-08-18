@@ -826,6 +826,12 @@ function levity:draw()
 	self.stats:draw()
 end
 
+function levity:screenToCamera(x, y)
+	local scale = self.camera.scale
+	return	(x - love.graphics.getWidth() *.5)/scale + self.camera.w*.5,
+		(y - love.graphics.getHeight()*.5)/scale + self.camera.h*.5
+end
+
 function love.load()
 	for a, ar in ipairs(arg) do
 		if ar == "-debug" then
@@ -843,7 +849,6 @@ function love.load()
 	love.joystick.loadGamepadMappings("levity/gamecontrollerdb.txt")
 	levity:loadNextMap()
 
-	love.mouse.setVisible(false)
 	love.graphics.setNewFont(18)
 end
 
