@@ -4,6 +4,7 @@ require "levity.class"
 
 local scripting = require "levity.scripting"
 local audio = require "levity.audio"
+local text = require "levity.text"
 local stats = require "levity.stats"
 
 local bit = require "bit"
@@ -19,8 +20,10 @@ local MaxIntScale = 4
 -- @field world
 -- @field map
 -- @field bank
+-- @field fonts
 -- @field camera
 -- @field stats
+-- @field maxdt
 -- @field drawbodies
 -- @field mappaused
 -- @field nextmapfile Will load and switch to this map on the next frame
@@ -104,6 +107,7 @@ local function dynamicObjectLayer_draw(self)
 	local camcx = levity.camera.x + camw*.5
 	local camcy = levity.camera.y + camh*.5
 	local tilesets = levity.map.tilesets
+	local fonts = levity.fonts
 
 	local function draw(object)
 		if object.visible == false then
@@ -160,8 +164,7 @@ local function dynamicObjectLayer_draw(self)
 		if text then
 			local textfont = object.properties.textfont
 			if textfont then
-				textfont = tilesets[textfont].properties.font
-				love.graphics.setFont(textfont)
+				fonts:use(textfont)
 			end
 
 			local textalign = object.properties.textalign
@@ -210,6 +213,7 @@ function levity:loadNextMap()
 	self.world = nil
 	self.map = nil
 	self.bank = audio.newBank()
+	self.fonts = text.newFonts()
 	self.camera = {
 		x = 0, y = 0,
 		w = love.graphics.getWidth(), h = love.graphics.getHeight(),
@@ -351,6 +355,7 @@ function levity:loadNextMap()
 	collectgarbage()
 
 	self.mappaused = false
+	self.maxdt = 1/16
 	return self.map
 end
 
@@ -730,10 +735,7 @@ function levity:destroyObjects()
 end
 
 function levity:update(dt)
-	if self.nextmapfile then
-		self:loadNextMap()
-	end
-
+	dt = math.min(dt, self.maxdt)
 	if not self.mappaused then
 		self.machine:broadcast("beginMove", dt)
 		self.world:update(dt)
@@ -748,6 +750,10 @@ function levity:update(dt)
 	collectgarbage("step", 1)
 
 	self.stats:update(dt)
+
+	if self.nextmapfile then
+		self:loadNextMap()
+	end
 end
 
 function levity:draw()
