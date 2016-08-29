@@ -587,13 +587,21 @@ function levity:addObject(object, layer, bodytype)
 	if object.gid then
 		self:setObjectGid(object, object.gid, true, bodytype)
 	else
+		local angle = math.rad(object.rotation)
 		if object.shape == "rectangle" then
 			shape = love.physics.newRectangleShape(
 				object.width * .5, object.height * .5,
 				object.width, object.height)
 		elseif object.shape == "ellipse" then
-			shape = love.physics.newCircleShape(
-				object.width * .5, object.height * .5,
+			-- workaround for worldcenter always matching position
+			-- in this case, for some reason
+			local halfw, halfh = object.width*.5, object.height*.5
+			local cos = math.cos(angle)
+			local sin = math.sin(angle)
+			object.x, object.y =
+				object.x + halfw*cos - halfh*sin,
+				object.y + halfw*sin + halfh*cos
+			shape = love.physics.newCircleShape(0, 0,
 				(object.width + object.height) * .25)
 		elseif object.shape == "polyline" then
 			local points = {}
@@ -606,8 +614,10 @@ function levity:addObject(object, layer, bodytype)
 				object.properties.loop or false, points)
 		end
 
-		object.body = love.physics.newBody(self.world, object.x, object.y, bodytype)
-		object.body:setAngle(math.rad(object.rotation))
+		object.body = love.physics.newBody(self.world,
+							object.x, object.y,
+							bodytype)
+		object.body:setAngle(angle)
 		local userdata = {
 			id = object.id,
 			object = object,
@@ -809,7 +819,10 @@ function levity:draw()
 
 		for _, fixture in ipairs(fixtures) do
 			local body = fixture:getBody()
-			love.graphics.circle("line", body:getX(), body:getY(), 1)
+			love.graphics.circle("line", body:getX(), body:getY(), 2)
+			local bodycx, bodycy = body:getWorldCenter()
+			love.graphics.line(bodycx - 2, bodycy, bodycx + 2, bodycy)
+			love.graphics.line(bodycx, bodycy - 2, bodycx, bodycy + 2)
 
 			local shape = fixture:getShape()
 			if shape:getType() == "circle" then
