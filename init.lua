@@ -167,10 +167,7 @@ local function dynamicObjectLayer_draw(self)
 				fonts:use(textfont)
 			end
 
-			local textalign = object.properties.textalign
-			if not textalign then
-				textalign = "left"
-			end
+			local textalign = object.properties.textalign or "center"
 
 			love.graphics.printf(text, object.x, object.y, 
 				object.width, textalign, object.rotation)
@@ -664,7 +661,7 @@ function levity:changeObjectLayer(object, layer)
 	local oldlayer = object.layer
 	if oldlayer then
 		removeObject(oldlayer.objects, object)
-		if object.gid then
+		if object.gid or object.properties.text then
 			removeObject(oldlayer.spriteobjects, object)
 		end
 	end
@@ -674,7 +671,7 @@ end
 
 function levity:addObjectToLayer(object, layer)
 	table.insert(layer.objects, object)
-	if object.gid then
+	if object.gid or object.properties.text then
 		table.insert(layer.spriteobjects, object)
 	end
 	object.layer = layer
