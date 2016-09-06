@@ -95,9 +95,11 @@ local function dynamicObjectLayer_update(self, dt)
 		end
 	end
 
-	table.sort(self.objects, function(object1, object2)
-		return object1.y < object2.y
-	end)
+	if self.draworder == "topdown" then
+		table.sort(self.objects, function(object1, object2)
+			return object1.y < object2.y
+		end)
+	end
 end
 
 local function dynamicObjectLayer_draw(self)
@@ -121,6 +123,10 @@ local function dynamicObjectLayer_draw(self)
 
 		machine:call(object.id, "beginDraw")
 
+		local left = object.x
+		local top = object.y
+		local right = left + (object.width or 0)
+		local bottom = top + (object.height or 0)
 		if object.tile then
 			local tile = object.tile
 			local tileset = tilesets[tile.tileset]
@@ -138,12 +144,22 @@ local function dynamicObjectLayer_draw(self)
 				oy = tileset.tileheight - oy
 				sy = -1
 			end
+			left = x - ox
+			top = y - oy
+			right = left + tileset.tilewidth
+			bottom = top + tileset.tileheight
 
 			love.graphics.draw(tileset.image, tile.quad, x, y,
 				object.rotation, sx, sy, ox, oy)
 		elseif object.body then
 			local body = object.body
 			for j, fixture in ipairs(body:getFixtureList()) do
+				local l, t, r, b = fixture:getBoundingBox()
+				left = math.min(left, l)
+				top = math.min(top, t)
+				right = math.max(right, r)
+				bottom = math.max(bottom, b)
+
 				local shape = fixture:getShape()
 				if shape:getType() == "circle" then
 					local x, y = body:getWorldPoint(
@@ -169,8 +185,8 @@ local function dynamicObjectLayer_draw(self)
 
 			local textalign = object.properties.textalign or "center"
 
-			love.graphics.printf(text, object.x, object.y, 
-				object.width, textalign, object.rotation)
+			love.graphics.printf(text, left, top, right - left,
+						textalign)--, object.rotation)
 		end
 
 		machine:call(object.id, "endDraw")
@@ -316,6 +332,7 @@ function levity:loadNextMap()
 			local offsetx = layer.offsetx
 			local offsety = layer.offsety
 			local properties = layer.properties
+			local draworder = layer.draworder
 
 			self.map:removeLayer(l)
 			layer = self:addDynamicLayer(name, l)
@@ -323,6 +340,7 @@ function levity:loadNextMap()
 			layer.offsetx = offsetx
 			layer.offsety = offsety
 			layer.properties = properties
+			layer.draworder = draworder
 
 			for _, object in ipairs(objects) do
 				local bodytype
@@ -332,9 +350,11 @@ function levity:loadNextMap()
 				self:addObject(object, layer, bodytype)
 			end
 
-			table.sort(layer.objects, function(object1, object2)
-				return object1.y < object2.y
-			end)
+			if layer.draworder == "topdown" then
+				table.sort(layer.objects, function(object1, object2)
+					return object1.y < object2.y
+				end)
+			end
 			self.map:setObjectData(layer)
 		end
 
