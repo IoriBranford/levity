@@ -24,6 +24,7 @@ local MaxIntScale = 4
 -- @field camera
 -- @field stats
 -- @field maxdt
+-- @field discardedobjects
 -- @field drawbodies
 -- @field mappaused
 -- @field nextmapfile Will load and switch to this map on the next frame
@@ -81,7 +82,17 @@ local function dynamicObject_updateAnimation(object, dt)
 	end
 end
 
+local function dynamicObjectLayer_addObject(self, object)
+	self.newobjects[#self.newobjects + 1] = object
+end
+
 local function dynamicObjectLayer_update(self, dt)
+	for i = #self.newobjects, 1, -1 do
+		local object = self.newobjects[i]
+		levity:initObject(object, self)
+		self.newobjects[i] = nil
+	end
+
 	for _, object in pairs(self.spriteobjects) do
 		local body = object.body
 		if body then
@@ -208,8 +219,10 @@ end
 
 --- @table DynamicLayer
 -- @field type "dynamiclayer"
+-- @field newobjects
 -- @field objects
 -- @field spriteobjects
+-- @field addObject dynamicObjectLayer_addObject
 -- @field update dynamicObjectLayer_update
 -- @field draw dynamicObjectLayer_draw
 -- @see ObjectLayer
@@ -236,6 +249,7 @@ function levity:loadNextMap()
 	}
 	self.stats = stats.newStats()
 	self.nextmapfile = nil
+	self.discardedobjects = {}
 	collectgarbage()
 
 	self:initPhysics()
@@ -334,7 +348,11 @@ function levity:loadNextMap()
 			local properties = layer.properties
 			local draworder = layer.draworder
 
+			for _, object in pairs(objects) do
+				object.layer = nil
+			end
 			self.map:removeLayer(l)
+
 			layer = self:addDynamicLayer(name, l)
 
 			layer.offsetx = offsetx
@@ -342,20 +360,9 @@ function levity:loadNextMap()
 			layer.properties = properties
 			layer.draworder = draworder
 
-			for _, object in ipairs(objects) do
-				local bodytype
-				if not object.properties.static then
-					bodytype = "dynamic"
-				end
-				self:addObject(object, layer, bodytype)
+			for _, object in pairs(objects) do
+				self:initObject(object, layer)
 			end
-
-			if layer.draworder == "topdown" then
-				table.sort(layer.objects, function(object1, object2)
-					return object1.y < object2.y
-				end)
-			end
-			self.map:setObjectData(layer)
 		end
 
 		self.machine:newScript(layer.name, layer.properties.script)
@@ -476,7 +483,6 @@ end
 -- @field anitime in milliseconds
 -- @field anitimescale
 -- @field aniframe
--- @field dead = true to destroy at end of update
 -- @see Object
 
 function levity:setObjectGid(object, gid, animated, bodytype)
@@ -588,7 +594,7 @@ function levity:setObjectGid(object, gid, animated, bodytype)
 	end
 end
 
-function levity:addObject(object, layer, bodytype)
+function levity:initObject(object, layer)
 	if object.visible == nil then
 		object.visible = true
 	end
@@ -598,6 +604,11 @@ function levity:addObject(object, layer, bodytype)
 	if not object.id then
 		object.id = self.map.nextobjectid
 		self.map.nextobjectid = self.map.nextobjectid + 1
+	end
+
+	local bodytype
+	if not object.properties.static then
+		bodytype = "dynamic"
 	end
 
 	local shape = nil
@@ -652,7 +663,7 @@ function levity:addObject(object, layer, bodytype)
 		end
 	end
 
-	self:addObjectToLayer(object, layer)
+	self:setObjectLayer(object, layer)
 	self.map.objects[object.id] = object
 	self.machine:newScript(object.id, object.properties.script)
 end
@@ -660,8 +671,15 @@ end
 function levity:addDynamicLayer(name, i)
 	local layer = self.map:addCustomLayer(name, i)
 	layer.type = "dynamiclayer"
+	layer.newobjects = {}
+	-- why newobjects is necessary:
+	-- http://www.lua.org/manual/5.1/manual.html#pdf-next
+	-- "The behavior of next [and therefore pairs] is undefined if, during
+	-- the traversal, you assign any value to a non-existent field in the
+	-- table [i.e. a new object]."
 	layer.objects = {}
 	layer.spriteobjects = {}
+	layer.addObject = dynamicObjectLayer_addObject
 	layer.update = dynamicObjectLayer_update
 	layer.draw = dynamicObjectLayer_draw
 	layer.offsetx = 0
@@ -669,11 +687,12 @@ function levity:addDynamicLayer(name, i)
 	return layer
 end
 
-function levity:changeObjectLayer(object, layer)
-	function removeObject(objects, obj)
-		for i, o in ipairs(objects) do
-			if o == obj then
-				return table.remove(objects, i)
+function levity:setObjectLayer(object, layer)
+	local function removeObject(objects)
+		for i, o in pairs(objects) do
+			if o == object then
+				table.remove(objects, i)
+				return
 			end
 		end
 	end
@@ -681,18 +700,18 @@ function levity:changeObjectLayer(object, layer)
 	local oldlayer = object.layer
 	if oldlayer then
 		removeObject(oldlayer.objects, object)
-		if object.gid or object.properties.text then
-			removeObject(oldlayer.spriteobjects, object)
+		if oldlayer.spriteobjects then
+			if object.gid or object.properties.text then
+				removeObject(oldlayer.spriteobjects, object)
+			end
 		end
 	end
 
-	self:addObjectToLayer(object, layer)
-end
-
-function levity:addObjectToLayer(object, layer)
-	table.insert(layer.objects, object)
-	if object.gid or object.properties.text then
-		table.insert(layer.spriteobjects, object)
+	if layer then
+		table.insert(layer.objects, object)
+		if object.gid or object.properties.text then
+			table.insert(layer.spriteobjects, object)
+		end
 	end
 	object.layer = layer
 end
@@ -733,47 +752,44 @@ function levity:setGidFlip(gid, flipx, flipy)
 	return gid
 end
 
-function levity:destroyObjects()
-	for _, layer in ipairs(self.map.layers) do
-		if layer.type == "dynamiclayer" and layer.objects then
-			for o = #layer.objects, 1, -1 do
-				local object = layer.objects[o]
-				if object.dead then
-					if object.body then
-						object.body:destroy()
-					end
+function levity:discardObject(id)
+	self.discardedobjects[id] = self.map.objects[id]
+end
 
-					if object.id and object.id > 0 then
-						self.machine:destroyScript(object.id)
-						self.map.objects[object.id] = nil
-					end
+function levity:cleanupObjects()
+	for id, object in pairs(self.discardedobjects) do
+		self:setObjectLayer(object, nil)
 
-					table.remove(layer.objects, o)
-				end
-			end
-			for o = #layer.spriteobjects, 1, -1 do
-				local object = layer.spriteobjects[o]
-				if object.dead then
-					table.remove(layer.spriteobjects, o)
-				end
-			end
+		if object.body then
+			object.body:destroy()
 		end
+
+		self.machine:destroyScript(id)
+
+		self.map.objects[id] = nil
+	end
+
+	for id, _ in pairs(self.discardedobjects) do
+		self.discardedobjects[id] = nil
 	end
 end
 
 function levity:update(dt)
 	dt = math.min(dt, self.maxdt)
+
+	self.machine:clearLogs()
 	if not self.mappaused then
 		self.machine:broadcast("beginMove", dt)
 		self.world:update(dt)
 		self.machine:broadcast("endMove", dt)
 
 		self.map:update(dt)
+		self.machine:printLogs()
 	end
 
 	self.bank:update(dt)
 
-	self:destroyObjects()
+	self:cleanupObjects()
 	collectgarbage("step", 1)
 
 	self.stats:update(dt)

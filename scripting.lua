@@ -4,6 +4,7 @@ require "levity.class"
 
 local Machine = class(function(self)
 	self.scripts = {}
+	self.logs = {}
 	self.classes = {}
 end)
 
@@ -33,24 +34,54 @@ end
 --- Destroy a script instance
 -- @param id The key for identifying the instance
 function Machine:destroyScript(id)
-	if id then
-		self.scripts[id] = nil
-	end
+	self.scripts[id] = nil
+	self.logs[id] = nil
 end
 
 function Machine:call(id, event, ...)
 	local script = self.scripts[id]
 	if script then
 		if script[event] then
+			local log = self.logs[id]
+			if log then
+				log[#log + 1] = { event, ... }
+			end
 			return script[event](script, ...)
 		end
 	end
 end
 
 function Machine:broadcast(event, ...)
-	for _, script in pairs(self.scripts) do
+	for id, script in pairs(self.scripts) do
 		if script[event] then
+			local log = self.logs[id]
+			if log then
+				log[#log + 1] = { event, ... }
+			end
 			script[event](script, ...)
+		end
+	end
+end
+
+function Machine:startLog(id)
+	self.logs[id] = {}
+end
+
+function Machine:printLogs()
+	for id, log in pairs(self.logs) do
+		for i = 1, #log, 1 do
+			print(unpack(log[i]))
+		end
+		if #log > 0 then
+			print("--")
+		end
+	end
+end
+
+function Machine:clearLogs()
+	for id, log in pairs(self.logs) do
+		for i = #log, 1, -1 do
+			log[i] = nil
 		end
 	end
 end
