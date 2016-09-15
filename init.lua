@@ -663,6 +663,11 @@ function levity:initObject(object, layer)
 		end
 	end
 
+	local textfont = object.properties.textfont
+	if textfont then
+		self.fonts:load(textfont)
+	end
+
 	self:setObjectLayer(object, layer)
 	self.map.objects[object.id] = object
 	self.machine:newScript(object.id, object.properties.script)
@@ -778,16 +783,19 @@ function levity:update(dt)
 	dt = math.min(dt, self.maxdt)
 
 	self.machine:clearLogs()
-	if not self.mappaused then
+
+	if self.mappaused then
+		self.bank:update(0)
+	else
 		self.machine:broadcast("beginMove", dt)
 		self.world:update(dt)
 		self.machine:broadcast("endMove", dt)
 
 		self.map:update(dt)
 		self.machine:printLogs()
-	end
 
-	self.bank:update(dt)
+		self.bank:update(dt)
+	end
 
 	self:cleanupObjects()
 	collectgarbage("step", 1)
