@@ -594,6 +594,12 @@ function levity:setObjectGid(object, gid, animated, bodytype)
 	end
 end
 
+function levity:newObjectId()
+	local id = self.map.nextobjectid
+	self.map.nextobjectid = self.map.nextobjectid + 1
+	return id
+end
+
 function levity:initObject(object, layer)
 	if object.visible == nil then
 		object.visible = true
@@ -602,8 +608,7 @@ function levity:initObject(object, layer)
 	object.properties = object.properties or {}
 
 	if not object.id then
-		object.id = self.map.nextobjectid
-		self.map.nextobjectid = self.map.nextobjectid + 1
+		object.id = self:newObjectId()
 	end
 
 	local bodytype
@@ -791,7 +796,9 @@ function levity:update(dt)
 		self.world:update(dt)
 		self.machine:broadcast("endMove", dt)
 
-		self.map:update(dt)
+		for _, layer in ipairs(self.map.layers) do
+			layer:update(dt)
+		end
 		self.machine:printLogs()
 
 		self.bank:update(dt)

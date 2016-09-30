@@ -7,22 +7,20 @@ end)
 function Stats:reset()
 	self.fps = 0
 	self.mem = 0
+	self.gfxstats = love.graphics.getStats()
+
 	self.timer = 0
 	self.rate = 1
-	self.framect = 0
-	self.timer = 0
-	self.rate = 1
-	self.framect = 0
 end
 
 function Stats:update(dt)
 	self.timer = self.timer + dt
-	self.framect = self.framect + 1
 	while self.timer > self.rate do
-		self.fps = math.floor(self.framect/self.rate)
+		self.fps = love.timer.getFPS()
 		self.mem = math.floor(collectgarbage('count'))
+		self.gfxstats = love.graphics.getStats()
+
 		self.timer = self.timer - self.rate
-		self.framect = 0
 	end
 end
 
@@ -34,9 +32,16 @@ function Stats:draw()
 		width = canvas:getWidth()
 	end
 
-	love.graphics.printf(self.fps.."fps", 0, 0, width, "right")
-	love.graphics.printf(self.mem.." kb", 0, font:getHeight(),
-				width, "right")
+	local y = 0
+	love.graphics.printf(self.fps.."fps", 0, y, width, "right")
+	y = y + font:getHeight()
+	love.graphics.printf(self.mem.." kb", 0, y, width, "right")
+	y = y + font:getHeight()
+
+	for stat, value in pairs(self.gfxstats) do
+		love.graphics.printf(value..' '..stat, 0, y, width, "right")
+		y = y + font:getHeight()
+	end
 end
 
 local stats = {
