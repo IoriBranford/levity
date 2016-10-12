@@ -28,6 +28,7 @@ local MaxIntScale = 4
 -- @field drawbodies
 -- @field mappaused
 -- @field nextmapfile Will load and switch to this map on the next frame
+-- @field nextmapdata
 
 local levity = {}
 
@@ -213,8 +214,9 @@ local function dynamicObjectLayer_draw(self)
 	machine:call(self.name, "endDraw")
 end
 
-function levity:setNextMap(nextmapfile)
+function levity:setNextMap(nextmapfile, nextmapdata)
 	self.nextmapfile = nextmapfile
+	self.nextmapdata = nextmapdata or {}
 end
 
 --- @table DynamicLayer
@@ -475,6 +477,41 @@ function levity:getTilesetImage(tilesetid)
 	return self.map.tilesets[tilesetid].image
 end
 
+function levity:updateTilesetAnimations(tileset, dt)
+	if type(tileset) ~= "table" then
+		tileset = self.map.tilesets[tileset]
+	end
+	self:updateTileAnimations(tileset.firstgid, tileset.tilecount, dt)
+end
+
+function levity:updateTileAnimations(firstgid, numtiles, dt)
+	local tiles = self.map.tiles
+	local tilesets = self.map.tilesets
+	local tileinstances = self.map.tileInstances
+
+	for gid = firstgid, firstgid + numtiles do
+		local tile = tiles[gid]
+		if tile and tile.animation then
+			local update = false
+			tile.time = tile.time + dt * 1000
+
+			while tile.time > tonumber(tile.animation[tile.frame].duration) do
+				update     = true
+				tile.time  = tile.time  - tonumber(tile.animation[tile.frame].duration)
+				tile.frame = tile.frame + 1
+
+				if tile.frame > #tile.animation then tile.frame = 1 end
+			end
+
+			if update and tileinstances[tile.gid] then
+				for _, j in pairs(tileinstances[tile.gid]) do
+					local t = tiles[tonumber(tile.animation[tile.frame].tileid) + tilesets[tile.tileset].firstgid]
+					j.batch:set(j.id, t.quad, j.x, j.y, j.r, tile.sx, tile.sy, 0, j.oy)
+				end
+			end
+		end
+	end
+end
 --- @table DynamicObject
 -- @field body
 -- @field layer
