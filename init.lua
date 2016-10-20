@@ -489,7 +489,7 @@ function levity:updateTileAnimations(firstgid, numtiles, dt)
 	local tilesets = self.map.tilesets
 	local tileinstances = self.map.tileInstances
 
-	for gid = firstgid, firstgid + numtiles do
+	for gid = firstgid, firstgid + numtiles - 1 do
 		local tile = tiles[gid]
 		if tile and tile.animation then
 			local update = false
