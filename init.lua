@@ -62,10 +62,10 @@ local function dynamicObject_updateAnimation(object, dt)
 	local advanceframe = false
 	local looped = false
 	object.anitime = object.anitime + dt * 1000 * object.anitimescale
-	while object.anitime > tonumber(animation[object.aniframe].duration) do
+	while object.anitime > (animation[object.aniframe].duration) do
 		advanceframe = true
 		object.anitime  = object.anitime -
-		tonumber(animation[object.aniframe].duration)
+		(animation[object.aniframe].duration)
 		object.aniframe = object.aniframe + 1
 		if object.aniframe > #animation then
 			looped = true
@@ -74,7 +74,7 @@ local function dynamicObject_updateAnimation(object, dt)
 	end
 
 	if advanceframe then
-		local tileid = tonumber(animation[object.aniframe].tileid)
+		local tileid = (animation[object.aniframe].tileid)
 		object.tile = levity:getMapTile(object.tile.tileset, tileid)
 	end
 
@@ -316,7 +316,7 @@ function levity:loadNextMap()
 				if commonanimation and not tile.animation then
 					tile.animation = {}
 					for _, frame in ipairs(commonanimation) do
-						local tileid = tile.id + tonumber(frame.tileid)
+						local tileid = tile.id + (frame.tileid)
 
 						table.insert(tile.animation, {
 							tileid = tostring(tileid),
@@ -450,7 +450,7 @@ function levity:getTileRowName(gid)
 	local tileset = self.map.tilesets[self.map.tiles[gid].tileset]
 	local tileid = gid - tileset.firstgid
 	local row = tileid / tileset.tilecolumns
-	return tileset.rownames[row]
+	return tileset.rownames[row] or math.floor(row)
 end
 
 function levity:getTileColumnName(gid)
@@ -458,7 +458,7 @@ function levity:getTileColumnName(gid)
 	local tileset = self.map.tilesets[self.map.tiles[gid].tileset]
 	local tileid = gid - tileset.firstgid
 	local column = tileid % tileset.tilecolumns
-	return tileset.columnnames[column]
+	return tileset.columnnames[column] or column
 end
 
 function levity:getMapTileset(tilesetid)
@@ -475,6 +475,41 @@ end
 
 function levity:getTilesetImage(tilesetid)
 	return self.map.tilesets[tilesetid].image
+end
+
+--- Convert list of map-specific gids to map-agnostic names
+-- @param gids list
+-- @return List of name tables: { {tileset, row, column}, ... }
+function levity:tileGidsToNames(gids)
+	if not gids then
+		return nil
+	end
+	local names = {}
+	for _, gid in ipairs(gids) do
+		local tileset = self.map.tilesets[self.map.tiles[gid].tileset]
+
+		names[#names + 1] = {
+			tileset = tileset.name,
+			row = self:getTileRowName(gid),
+			column = self:getTileColumnName(gid)
+		}
+	end
+	return names
+end
+
+--- Convert name tables to gids for current map
+-- @param names list returned by tileGidsToNames
+-- @return List of tile gids
+function levity:tileNamesToGids(names)
+	if not names then
+		return nil
+	end
+	local gids = {}
+	for _, name in ipairs(names) do
+		gids[#gids + 1] = self:getTileGid(name.tileset,
+						name.row, name.column)
+	end
+	return gids
 end
 
 function levity:updateTilesetAnimations(tileset, dt)
@@ -495,9 +530,9 @@ function levity:updateTileAnimations(firstgid, numtiles, dt)
 			local update = false
 			tile.time = tile.time + dt * 1000
 
-			while tile.time > tonumber(tile.animation[tile.frame].duration) do
+			while tile.time > (tile.animation[tile.frame].duration) do
 				update     = true
-				tile.time  = tile.time  - tonumber(tile.animation[tile.frame].duration)
+				tile.time  = tile.time  - (tile.animation[tile.frame].duration)
 				tile.frame = tile.frame + 1
 
 				if tile.frame > #tile.animation then tile.frame = 1 end
@@ -505,7 +540,7 @@ function levity:updateTileAnimations(firstgid, numtiles, dt)
 
 			if update and tileinstances[tile.gid] then
 				for _, j in pairs(tileinstances[tile.gid]) do
-					local t = tiles[tonumber(tile.animation[tile.frame].tileid) + tilesets[tile.tileset].firstgid]
+					local t = tiles[(tile.animation[tile.frame].tileid) + tilesets[tile.tileset].firstgid]
 					j.batch:set(j.id, t.quad, j.x, j.y, j.r, tile.sx, tile.sy, 0, j.oy)
 				end
 			end
@@ -847,6 +882,8 @@ function levity:update(dt)
 	self.stats:update(dt)
 
 	if self.nextmapfile then
+		levity.machine:broadcast("nextMap",
+			self.nextmapfile, self.nextmapdata)
 		self:loadNextMap()
 	end
 end

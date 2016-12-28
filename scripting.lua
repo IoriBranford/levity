@@ -49,7 +49,7 @@ end
 
 --- Start a new instance of a script
 -- @param id A key by which to reference the script instance
--- @param name Name of script
+-- @param name Name of script class
 -- @return The new script instance
 function Machine:newScript(id, name, ...)
 	local script
