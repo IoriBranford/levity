@@ -88,9 +88,8 @@ local function dynamicObjectLayer_addObject(self, object)
 end
 
 local function dynamicObjectLayer_update(self, dt)
-	for i = #self.newobjects, 1, -1 do
-		local object = self.newobjects[i]
-		levity:initObject(object, self)
+	for i = 1, #self.newobjects do
+		levity:initObject(self.newobjects[i], self)
 		self.newobjects[i] = nil
 	end
 
