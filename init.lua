@@ -87,10 +87,21 @@ local function dynamicObjectLayer_addObject(self, object)
 	self.newobjects[#self.newobjects + 1] = object
 end
 
+local LayerMaxNewObjects = 256
+local LayerAddedTooManyObjectsMessage = 
+[[Tried to add too many (]]..LayerMaxNewObjects..[[) objects at a time to one
+layer. Avoid recursive object creation in object init functions.]]
+
 local function dynamicObjectLayer_update(self, dt)
 	local numnewobj = #self.newobjects
 	for i = 1, numnewobj do
 		levity:initObject(self.newobjects[i], self)
+		numnewobj = #self.newobjects
+		assert(numnewobj <= LayerMaxNewObjects,
+			LayerAddedTooManyObjectsMessage)
+	end
+
+	for i = 1, #self.newobjects do
 		self.newobjects[i] = nil
 	end
 
@@ -280,7 +291,13 @@ function levity:loadNextMap()
 		tileset.columnnames = {}
 
 		for p, v in pairs(tileset.properties) do
-			if string.find(p, "row_") == 1 then
+			if string.find(p, "rowname") == 1 then
+				local num = string.sub(p, 8)
+				tileset.rownames[tonumber(num)] = v
+			elseif string.find(p, "colname") == 1 then
+				local num = string.sub(p, 8)
+				tileset.columnnames[tonumber(num)] = v
+			elseif string.find(p, "row_") == 1 then
 				tileset.rownames[v] = string.sub(p, 5)
 			elseif string.find(p, "column_") == 1 then
 				tileset.columnnames[v] = string.sub(p, 8)
@@ -362,8 +379,14 @@ function levity:loadNextMap()
 			layer.properties = properties
 			layer.draworder = draworder
 
-			for _, object in pairs(objects) do
-				self:initObject(object, layer)
+			if self.map.properties.delayinitobjects then
+				for _, object in pairs(objects) do
+					self:setObjectLayer(object, layer)
+				end
+			else
+				for _, object in pairs(objects) do
+					self:initObject(object, layer)
+				end
 			end
 		end
 
@@ -780,6 +803,10 @@ function levity:setObjectLayer(object, layer)
 	end
 
 	local oldlayer = object.layer
+	if oldlayer == layer then
+		return
+	end
+
 	if oldlayer then
 		removeObject(oldlayer.objects, object)
 		if oldlayer.spriteobjects then
