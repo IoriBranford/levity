@@ -928,7 +928,7 @@ function levity:draw()
 	local scale = self.camera.scale
 	local intscale = math.min(math.floor(scale), MaxIntScale)
 
-	self.map:setDrawRange(cx, cy, cw, ch)
+	--self.map:setDrawRange(cx, cy, cw, ch)
 
 	local canvas = self.map.canvas
 	love.graphics.setCanvas(canvas)
