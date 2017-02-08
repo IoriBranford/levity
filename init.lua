@@ -23,6 +23,7 @@ local MaxIntScale = 4
 -- @field fonts
 -- @field camera
 -- @field stats
+-- @field timescale
 -- @field maxdt
 -- @field discardedobjects
 -- @field drawbodies
@@ -405,6 +406,7 @@ function levity:loadNextMap()
 
 	self.mappaused = false
 	self.maxdt = 1/16
+	self.timescale = 1
 	return self.map
 end
 
@@ -684,7 +686,9 @@ function levity:setObjectGid(object, gid, animated, bodytype)
 	local objectgroup = object.tile.objectGroup
 	if fixtureschanged and objectgroup then
 		for i, shapeobj in ipairs(objectgroup.objects) do
-			addFixture(shapeobj)
+			if shapeobj.properties.collidable == true then
+				addFixture(shapeobj)
+			end
 		end
 	end
 end
@@ -885,6 +889,7 @@ end
 
 function levity:update(dt)
 	dt = math.min(dt, self.maxdt)
+	dt = dt*self.timescale
 
 	self.machine:clearLogs()
 
