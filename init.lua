@@ -1,3 +1,8 @@
+love.filesystem.setRequirePath(
+	"levity/pl/lua/?.lua;"..
+	"levity/pl/lua/?/init.lua;"..
+	love.filesystem.getRequirePath())
+
 require "levity.xcoroutine"
 require "levity.xmath"
 require "levity.class"
@@ -94,6 +99,10 @@ local LayerAddedTooManyObjectsMessage =
 [[Tried to add too many (]]..LayerMaxNewObjects..[[) objects at a time to one
 layer. Avoid recursive object creation in object init functions.]]
 
+local function objectIsAbove(object1, object2)
+	return object1.y < object2.y
+end
+
 local function dynamicObjectLayer_update(self, dt)
 	local numnewobj = #self.newobjects
 	for i = 1, numnewobj do
@@ -121,9 +130,7 @@ local function dynamicObjectLayer_update(self, dt)
 	end
 
 	if self.draworder == "topdown" then
-		table.sort(self.objects, function(object1, object2)
-			return object1.y < object2.y
-		end)
+		table.sort(self.spriteobjects, objectIsAbove)
 	end
 end
 
@@ -220,7 +227,7 @@ local function dynamicObjectLayer_draw(self)
 	machine:call(self.name, "beginDraw")
 	love.graphics.push()
 	love.graphics.translate(self.offsetx, self.offsety)
-	for _, object in pairs(self.objects) do
+	for _, object in ipairs(self.spriteobjects) do
 		draw(object)
 	end
 	love.graphics.pop()
