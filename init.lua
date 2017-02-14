@@ -2,6 +2,7 @@ require "levity.xcoroutine"
 require "levity.xmath"
 require "levity.class"
 
+local maputil = require "levity.maputil"
 local scripting = require "levity.scripting"
 local audio = require "levity.audio"
 local text = require "levity.text"
@@ -269,6 +270,13 @@ function levity:loadNextMap()
 	self:initPhysics()
 
 	self.map = sti(self.mapfile, {"box2d"})
+
+	self.map.objecttypes = maputil.loadObjectTypesFile("objecttypes.xml")
+	if self.map.objecttypes then
+		maputil.setObjectsDefaultProperties(self.map.objects,
+							self.map.objecttypes)
+	end
+
 	local width = self.map.width * self.map.tilewidth
 	local height = self.map.height * self.map.tileheight
 
