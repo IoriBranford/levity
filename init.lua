@@ -303,22 +303,44 @@ function levity:loadNextMap()
 		tileset.tilecolumns =
 			math.floor(tileset.imagewidth / tileset.tilewidth)
 
+		tileset.namedtileids = {}
+		tileset.namedrows = {}
+		tileset.namedcols = {}
 		tileset.rownames = {}
 		tileset.columnnames = {}
+		--tileset.tilenames = {}
 
 		for p, v in pairs(tileset.properties) do
 			if string.find(p, "rowname") == 1 then
-				local num = string.sub(p, 8)
-				tileset.rownames[tonumber(num)] = v
+				local num = tonumber(string.sub(p, 8))
+				tileset.rownames[num] = v
+				tileset.namedrows[v] = num
 			elseif string.find(p, "colname") == 1 then
-				local num = string.sub(p, 8)
-				tileset.columnnames[tonumber(num)] = v
+				local num = tonumber(string.sub(p, 8))
+				tileset.columnnames[num] = v
+				tileset.namedcols[v] = num
 			elseif string.find(p, "row_") == 1 then
-				tileset.rownames[v] = string.sub(p, 5)
+				local name = string.sub(p, 5)
+				tileset.rownames[v] = name
+				tileset.namedrows[name] = v
 			elseif string.find(p, "column_") == 1 then
-				tileset.columnnames[v] = string.sub(p, 8)
+				local name = string.sub(p, 8)
+				tileset.columnnames[v] = name
+				tileset.namedcols[name] = v
 			end
 		end
+
+		for _, tile in pairs(tileset.tiles) do
+			if tile.properties then
+				local name = tile.properties.name
+				if name then
+					--tileset.tilenames[tile.id] = tilename
+					tileset.namedtileids[name] = tile.id
+				end
+			end
+		end
+
+		local lastgid = tileset.firstgid + tileset.tilecount - 1
 
 		local commonanimation = tileset.properties.commonanimation
 
@@ -329,6 +351,21 @@ function levity:loadNextMap()
 				self.map.tiles[commonanimationtilegid]
 
 			commonanimation = commonanimationtile.animation
+
+			for i = tileset.firstgid, lastgid do
+				local tile = self.map.tiles[i]
+				if not tile.animation then
+					tile.animation = {}
+					for _, frame in ipairs(commonanimation) do
+						local tileid = tile.id + (frame.tileid)
+
+						table.insert(tile.animation, {
+							tileid = tostring(tileid),
+							duration = frame.duration
+						})
+					end
+				end
+			end
 		end
 
 		local commoncollision = tileset.properties.commoncollision
@@ -340,25 +377,10 @@ function levity:loadNextMap()
 				self.map.tiles[commoncollisiontilegid]
 
 			commoncollision = commoncollisiontile.objectGroup
-		end
 
-		if commonanimation or commoncollision then
-			for i = tileset.firstgid, tileset.firstgid + tileset.tilecount - 1, 1 do
+			for i = tileset.firstgid, lastgid do
 				local tile = self.map.tiles[i]
-
-				if commonanimation and not tile.animation then
-					tile.animation = {}
-					for _, frame in ipairs(commonanimation) do
-						local tileid = tile.id + (frame.tileid)
-
-						table.insert(tile.animation, {
-							tileid = tostring(tileid),
-							duration = frame.duration
-						})
-					end
-				end
-
-				if commoncollision and not tile.objectGroup then
+				if not tile.objectGroup then
 					tile.objectGroup = commoncollision
 				end
 			end
@@ -470,19 +492,26 @@ function levity:getTileGid(tilesetid, row, column)
 		return nil
 	end
 
-	if type(column) == "string" then
-		column = tileset.properties["column_"..column]
+	local tileid
+
+	if not column then
+		tileid = row
+		if type(tileid) == "string" then
+			tileid = tileset.namedtileids[tileid]
+		end
+	elseif row then
+		if type(column) == "string" then
+			column = tileset.namedcols[column]
+		end
+
+		if type(row) == "string" then
+			row = tileset.namedrows[row]
+		end
+
+		tileid = row * tileset.tilecolumns + column
 	end
 
-	if type(row) == "string" then
-		row = tileset.properties["row_"..row]
-	end
-
-	if not column or not row then
-		return nil
-	end
-
-	return tileset.firstgid + row * tileset.tilecolumns + column
+	return tileset.firstgid + tileid
 end
 
 function levity:getTileRowName(gid)
@@ -597,13 +626,15 @@ end
 -- @field aniframe
 -- @see Object
 
-function levity:setObjectGid(object, gid, animated, bodytype)
+function levity:setObjectGid(object, gid, animated, bodytype, applyfixtures)
 	local newtile = self.map.tiles[self:getUnflippedGid(gid)]
 	local newtileset = self.map.tilesets[newtile.tileset]
-	local fixtureschanged = object.body == nil or
-		newtile.tileset ~= object.tile.tileset or
-		(newtileset.properties.commoncollision == nil and
+	if applyfixtures == nil then
+		applyfixtures = object.body == nil or
+			newtile.tileset ~= object.tile.tileset or
+			(newtileset.properties.commoncollision == nil and
 			gid ~= object.gid)
+	end
 
 	if animated == nil then
 		animated = true
@@ -624,8 +655,8 @@ function levity:setObjectGid(object, gid, animated, bodytype)
 	end
 
 	if object.body then
-		if fixtureschanged then
-			for _, fixture in ipairs(object.body:getFixtureList()) do
+		if applyfixtures then
+			for _, fixture in pairs(object.body:getFixtureList()) do
 				fixture:destroy()
 			end
 			object.body:getUserData().fixtures = nil
@@ -699,7 +730,7 @@ function levity:setObjectGid(object, gid, animated, bodytype)
 	end
 
 	local objectgroup = object.tile.objectGroup
-	if fixtureschanged and objectgroup then
+	if applyfixtures and objectgroup then
 		for i, shapeobj in ipairs(objectgroup.objects) do
 			if shapeobj.properties.collidable == true then
 				addFixture(shapeobj)
