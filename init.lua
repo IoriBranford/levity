@@ -254,7 +254,11 @@ function levity:loadNextMap()
 	assert(self.nextmapfile, "Next map not set. In main.lua call levity:setNextMap to set the first map")
 	self.mapfile = self.nextmapfile
 
+	if self.machine then
+		self.machine:unrequireAll()
+	end
 	self.machine = scripting.newMachine()
+
 	if self.world then
 		self.world:destroy()
 	end

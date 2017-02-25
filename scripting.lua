@@ -11,13 +11,20 @@ end)
 --- Get a script class, loading it if not loaded already
 -- @name of the class (not file name or path)
 -- @return The script class
-function Machine:requireScript(name)
-	local scriptclass = self.classes[name]
-	if not scriptclass then
-		scriptclass = love.filesystem.load(name..".lua")()
-		self.classes[name] = scriptclass
+--function Machine:requireScript(name)
+--	local scriptclass = self.classes[name]
+--	if not scriptclass then
+--		scriptclass = love.filesystem.load(name..".lua")()
+--		self.classes[name] = scriptclass
+--	end
+--	return scriptclass
+--end
+
+--- Clean up all script classes
+function Machine:unrequireAll()
+	for name, _ in pairs(self.classes) do
+		package.loaded[name] = nil
 	end
-	return scriptclass
 end
 
 --- Make a script start responding to a type of event
@@ -54,7 +61,9 @@ end
 function Machine:newScript(id, name, ...)
 	local script
 	if name then
-		local scriptclass = self:requireScript(name)
+		local scriptclass = require(name)
+			--self:requireScript(name)
+		self.classes[name] = scriptclass
 		script = scriptclass(id, ...)
 
 		for event, func in pairs(scriptclass) do
