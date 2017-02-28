@@ -665,7 +665,7 @@ function levity:setObjectGid(object, gid, animated, bodytype, applyfixtures)
 			end
 			object.body:getUserData().fixtures = nil
 		end
-		if bodytype then
+		if bodytype and bodytype ~= object.body:getType() then
 			object.body:setType(bodytype)
 		end
 	else
