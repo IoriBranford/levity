@@ -755,6 +755,9 @@ function levity:initObject(object, layer)
 	end
 	object.rotation = object.rotation or 0
 	object.properties = object.properties or {}
+	if self.map.objecttypes then
+		maputil.setObjectDefaultProperties(object, self.map.objecttypes)
+	end
 
 	if not object.id then
 		object.id = self:newObjectId()
