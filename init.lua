@@ -22,20 +22,23 @@ local FlipYBit = 0x40000000
 local MaxIntScale = 4
 
 --- @table levity
--- @field machine
--- @field world
 -- @field map
 -- @field bank
 -- @field fonts
--- @field camera
 -- @field stats
 -- @field timescale
 -- @field maxdt
--- @field discardedobjects
 -- @field drawbodies
--- @field mappaused
 -- @field nextmapfile Will load and switch to this map on the next frame
 -- @field nextmapdata
+
+--- @table Map
+-- @field objecttypes
+-- @field scripts
+-- @field world
+-- @field camera
+-- @field discardedobjects
+-- @field paused
 
 local levity = {}
 
@@ -86,7 +89,7 @@ local function dynamicObject_updateAnimation(object, dt)
 	end
 
 	if looped then
-		levity.machine:call(object.id, "loopedAnimation")
+		levity.map.scripts:call(object.id, "loopedAnimation")
 	end
 end
 
@@ -135,11 +138,11 @@ local function dynamicObjectLayer_update(self, dt)
 end
 
 local function dynamicObjectLayer_draw(self)
-	local machine = levity.machine
-	local camw = levity.camera.w
-	local camh = levity.camera.h
-	local camcx = levity.camera.x + camw*.5
-	local camcy = levity.camera.y + camh*.5
+	local scripts = levity.map.scripts
+	local camw = levity.map.camera.w
+	local camh = levity.map.camera.h
+	local camcx = levity.map.camera.x + camw*.5
+	local camcy = levity.map.camera.y + camh*.5
 	local tilesets = levity.map.tilesets
 	local fonts = levity.fonts
 
@@ -153,7 +156,7 @@ local function dynamicObjectLayer_draw(self)
 			return
 		end
 
-		machine:call(object.id, "beginDraw")
+		scripts:call(object.id, "beginDraw")
 
 		local left = object.x
 		local top = object.y
@@ -221,17 +224,17 @@ local function dynamicObjectLayer_draw(self)
 						textalign)--, object.rotation)
 		end
 
-		machine:call(object.id, "endDraw")
+		scripts:call(object.id, "endDraw")
 	end
 
-	machine:call(self.name, "beginDraw")
+	scripts:call(self.name, "beginDraw")
 	love.graphics.push()
 	love.graphics.translate(self.offsetx, self.offsety)
 	for _, object in ipairs(self.spriteobjects) do
 		draw(object)
 	end
 	love.graphics.pop()
-	machine:call(self.name, "endDraw")
+	scripts:call(self.name, "endDraw")
 end
 
 function levity:setNextMap(nextmapfile, nextmapdata)
@@ -254,33 +257,32 @@ function levity:loadNextMap()
 	assert(self.nextmapfile, "Next map not set. In main.lua call levity:setNextMap to set the first map")
 	self.mapfile = self.nextmapfile
 
-	if self.machine then
-		self.machine:unrequireAll()
-	end
-	self.machine = scripting.newMachine()
+	if self.map then
+		if self.map.scripts then
+			self.map.scripts:unrequireAll()
+		end
 
-	if self.world then
-		self.world:destroy()
+		if self.map.world then
+			self.map.world:destroy()
+		end
 	end
-	self.world = nil
-	self.map = nil
 	self.bank = audio.newBank()
 	self.fonts = text.newFonts()
-	self.camera = {
+	self.stats = stats.newStats()
+	self.nextmapfile = nil
+	collectgarbage()
+
+	self.map = sti(self.mapfile, {"box2d"})
+	self.map.scripts = scripting.newMachine()
+	self.map.discardedobjects = {}
+	self.map.camera = {
 		x = 0, y = 0,
 		w = love.graphics.getWidth(), h = love.graphics.getHeight(),
 		scale = 1,
 		set = camera_set,
 		zoom = camera_zoom
 	}
-	self.stats = stats.newStats()
-	self.nextmapfile = nil
-	self.discardedobjects = {}
-	collectgarbage()
-
 	self:initPhysics()
-
-	self.map = sti(self.mapfile, {"box2d"})
 
 	self.map.objecttypes = maputil.loadObjectTypesFile("objecttypes.xml")
 	if self.map.objecttypes then
@@ -298,7 +300,7 @@ function levity:loadNextMap()
 		self.bank:load(self.map.properties.streamsounds, "stream")
 	end
 	if self.map.properties.gravity then
-		self.world:setGravity(0, self.map.properties.gravity)
+		self.map.world:setGravity(0, self.map.properties.gravity)
 	end
 
 	for _, tileset in ipairs(self.map.tilesets) do
@@ -432,20 +434,20 @@ function levity:loadNextMap()
 			end
 		end
 
-		self.machine:newScript(layer.name, layer.properties.script)
+		self.map.scripts:newScript(layer.name, layer.properties.script)
 	end
 
-	self.map:box2d_init(self.world)
+	self.map:box2d_init(self.map.world)
 
-	self.machine:newScript(self.mapfile, self.map.properties.script)
+	self.map.scripts:newScript(self.mapfile, self.map.properties.script)
 
-	local intscale = math.min(math.floor(self.camera.scale), MaxIntScale)
-	self.map:resize(self.camera.w * intscale,
-			self.camera.h * intscale)
+	local intscale = math.min(math.floor(self.map.camera.scale), MaxIntScale)
+	self.map:resize(self.map.camera.w * intscale,
+			self.map.camera.h * intscale)
 	self.map.canvas:setFilter("linear", "linear")
 	collectgarbage()
 
-	self.mappaused = false
+	self.map.paused = false
 	self.maxdt = 1/16
 	self.timescale = 1
 	return self.map
@@ -456,7 +458,7 @@ local function collisionEvent(event, fixture, ...)
 	if ud then
 		local id = ud.id
 		if id then
-			levity.machine:call(id, event, fixture, ...)
+			levity.map.scripts:call(id, event, fixture, ...)
 		end
 	end
 end
@@ -486,8 +488,8 @@ end
 
 function levity:initPhysics()
 	love.physics.setMeter(64)
-	self.world = love.physics.newWorld(0, 0)
-	self.world:setCallbacks(beginContact, endContact, preSolve, postSolve)
+	self.map.world = love.physics.newWorld(0, 0)
+	self.map.world:setCallbacks(beginContact, endContact, preSolve, postSolve)
 end
 
 function levity:getTileGid(tilesetid, row, column)
@@ -669,7 +671,7 @@ function levity:setObjectGid(object, gid, animated, bodytype, applyfixtures)
 			object.body:setType(bodytype)
 		end
 	else
-		object.body = love.physics.newBody(self.world,
+		object.body = love.physics.newBody(self.map.world,
 						object.x, object.y, bodytype)
 		object.body:setAngle(math.rad(object.rotation))
 		object.body:setUserData({
@@ -799,7 +801,7 @@ function levity:initObject(object, layer)
 				object.properties.loop or false, points)
 		end
 
-		object.body = love.physics.newBody(self.world,
+		object.body = love.physics.newBody(self.map.world,
 							object.x, object.y,
 							bodytype)
 		object.body:setAngle(angle)
@@ -827,7 +829,7 @@ function levity:initObject(object, layer)
 
 	self:setObjectLayer(object, layer)
 	self.map.objects[object.id] = object
-	self.machine:newScript(object.id, object.properties.script)
+	self.map.scripts:newScript(object.id, object.properties.script)
 end
 
 function levity:addDynamicLayer(name, i)
@@ -919,24 +921,24 @@ function levity:setGidFlip(gid, flipx, flipy)
 end
 
 function levity:discardObject(id)
-	self.discardedobjects[id] = self.map.objects[id]
+	self.map.discardedobjects[id] = self.map.objects[id]
 end
 
 function levity:cleanupObjects()
-	for id, object in pairs(self.discardedobjects) do
+	for id, object in pairs(self.map.discardedobjects) do
 		self:setObjectLayer(object, nil)
 
 		if object.body then
 			object.body:destroy()
 		end
 
-		self.machine:destroyScript(id)
+		self.map.scripts:destroyScript(id)
 
 		self.map.objects[id] = nil
 	end
 
-	for id, _ in pairs(self.discardedobjects) do
-		self.discardedobjects[id] = nil
+	for id, _ in pairs(self.map.discardedobjects) do
+		self.map.discardedobjects[id] = nil
 	end
 end
 
@@ -944,19 +946,19 @@ function levity:update(dt)
 	dt = math.min(dt, self.maxdt)
 	dt = dt*self.timescale
 
-	self.machine:clearLogs()
+	self.map.scripts:clearLogs()
 
-	if self.mappaused then
+	if self.map.paused then
 		self.bank:update(0)
 	else
-		self.machine:broadcast("beginMove", dt)
-		self.world:update(dt)
-		self.machine:broadcast("endMove", dt)
+		self.map.scripts:broadcast("beginMove", dt)
+		self.map.world:update(dt)
+		self.map.scripts:broadcast("endMove", dt)
 
 		for _, layer in ipairs(self.map.layers) do
 			layer:update(dt)
 		end
-		self.machine:printLogs()
+		self.map.scripts:printLogs()
 
 		self.bank:update(dt)
 	end
@@ -967,7 +969,7 @@ function levity:update(dt)
 	self.stats:update(dt)
 
 	if self.nextmapfile then
-		levity.machine:broadcast("nextMap",
+		levity.map.scripts:broadcast("nextMap",
 			self.nextmapfile, self.nextmapdata)
 		self:loadNextMap()
 	end
@@ -979,11 +981,11 @@ function levity:draw()
 		return
 	end
 
-	local cx, cy = self.camera.x, self.camera.y
-	local cw, ch = self.camera.w, self.camera.h
+	local cx, cy = self.map.camera.x, self.map.camera.y
+	local cw, ch = self.map.camera.w, self.map.camera.h
 	local ccx, ccy = cx+cw*.5, cy+ch*.5
 
-	local scale = self.camera.scale
+	local scale = self.map.camera.scale
 	local intscale = math.min(math.floor(scale), MaxIntScale)
 
 	--self.map:setDrawRange(cx, cy, cw, ch)
@@ -995,13 +997,13 @@ function levity:draw()
 	love.graphics.translate(-(cx * intscale),
 				-(cy * intscale))
 	love.graphics.scale(intscale, intscale)
-	self.machine:call(self.mapfile, "beginDraw")
+	self.map.scripts:call(self.mapfile, "beginDraw")
 	for _, layer in ipairs(self.map.layers) do
 		if layer.visible and layer.opacity > 0 then
 			self.map:drawLayer(layer)
 		end
 	end
-	self.machine:call(self.mapfile, "endDraw")
+	self.map.scripts:call(self.mapfile, "endDraw")
 	love.graphics.pop()
 	love.graphics.setCanvas()
 
@@ -1018,7 +1020,7 @@ function levity:draw()
 	love.graphics.translate(-cx, -cy)
 	if self.drawbodies then
 		local fixtures = {}
-		self.world:queryBoundingBox(cx, cy, cx+cw, cy+ch,
+		self.map.world:queryBoundingBox(cx, cy, cx+cw, cy+ch,
 		function(fixture)
 			table.insert(fixtures, fixture)
 			return true
@@ -1053,9 +1055,9 @@ function levity:draw()
 end
 
 function levity:screenToCamera(x, y)
-	local scale = self.camera.scale
-	return	(x - love.graphics.getWidth() *.5)/scale + self.camera.w*.5,
-		(y - love.graphics.getHeight()*.5)/scale + self.camera.h*.5
+	local scale = self.map.camera.scale
+	return	(x - love.graphics.getWidth() *.5)/scale + self.map.camera.w*.5,
+		(y - love.graphics.getHeight()*.5)/scale + self.map.camera.h*.5
 end
 
 function love.load()
@@ -1079,78 +1081,78 @@ function love.load()
 end
 
 function love.keypressed(key, u)
-	levity.machine:broadcast("keypressed", key, u)
-	levity.machine:broadcast("keypressed_"..key, u)
+	levity.map.scripts:broadcast("keypressed", key, u)
+	levity.map.scripts:broadcast("keypressed_"..key, u)
 end
 
 function love.keyreleased(key, u)
-	levity.machine:broadcast("keyreleased", key, u)
-	levity.machine:broadcast("keyreleased_"..key, u)
+	levity.map.scripts:broadcast("keyreleased", key, u)
+	levity.map.scripts:broadcast("keyreleased_"..key, u)
 end
 
 function love.touchpressed(touch, x, y, dx, dy, pressure)
-	levity.machine:broadcast("touchpressed", touch, x, y)
+	levity.map.scripts:broadcast("touchpressed", touch, x, y)
 end
 
 function love.touchmoved(touch, x, y, dx, dy, pressure)
-	levity.machine:broadcast("touchmoved", touch, x, y, dx, dy)
+	levity.map.scripts:broadcast("touchmoved", touch, x, y, dx, dy)
 end
 
 function love.touchreleased(touch, x, y, dx, dy, pressure)
-	levity.machine:broadcast("touchreleased", touch, x, y, dx, dy)
+	levity.map.scripts:broadcast("touchreleased", touch, x, y, dx, dy)
 end
 
 function love.joystickaxis(joystick, axis, value)
-	levity.machine:broadcast("joystickaxis", joystick, axis, value)
+	levity.map.scripts:broadcast("joystickaxis", joystick, axis, value)
 end
 
 function love.joystickpressed(joystick, button)
-	levity.machine:broadcast("joystickpressed", joystick, button)
+	levity.map.scripts:broadcast("joystickpressed", joystick, button)
 end
 
 function love.joystickreleased(joystick, button)
-	levity.machine:broadcast("joystickreleased", joystick, button)
+	levity.map.scripts:broadcast("joystickreleased", joystick, button)
 end
 
 function love.gamepadaxis(joystick, axis, value)
-	levity.machine:broadcast("gamepadaxis", joystick, axis, value)
+	levity.map.scripts:broadcast("gamepadaxis", joystick, axis, value)
 end
 
 function love.gamepadpressed(joystick, button)
-	levity.machine:broadcast("gamepadpressed", joystick, button)
+	levity.map.scripts:broadcast("gamepadpressed", joystick, button)
 end
 
 function love.gamepadreleased(joystick, button)
-	levity.machine:broadcast("gamepadreleased", joystick, button)
+	levity.map.scripts:broadcast("gamepadreleased", joystick, button)
 end
 
 function love.mousepressed(x, y, button, istouch)
 	if istouch then
 		return
 	end
-	levity.machine:broadcast("mousepressed", x, y, button, istouch)
+	levity.map.scripts:broadcast("mousepressed", x, y, button, istouch)
 end
 
 function love.mousemoved(x, y, dx, dy, istouch)
 	if istouch then
 		return
 	end
-	levity.machine:broadcast("mousemoved", x, y, dx, dy)
+	levity.map.scripts:broadcast("mousemoved", x, y, dx, dy)
 end
 
 function love.mousereleased(x, y, button, istouch)
 	if istouch then
 		return
 	end
-	levity.machine:broadcast("mousereleased", x, y, button, istouch)
+	levity.map.scripts:broadcast("mousereleased", x, y, button, istouch)
 end
 
 function love.wheelmoved(x, y)
-	levity.machine:broadcast("wheelmoved", x, y)
+	levity.map.scripts:broadcast("wheelmoved", x, y)
 end
 
 function love.resize(w, h)
-	local camera = levity.camera
+	local camera = levity.map.camera
 	local scale = math.min(w/camera.w, h/camera.h)
 	local intscale = math.min(math.floor(scale), MaxIntScale)
 	if intscale ~= math.floor(camera.scale) then
