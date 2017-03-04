@@ -63,7 +63,7 @@ function levity:loadNextMap()
 	self.map = Map.load(self.mapfile)
 
 	self.map.scripts = scripting.newMachine()
-	for _, layer in pairs(self.map.layers) do
+	for _, layer in ipairs(self.map.layers) do
 		if layer.type == "dynamiclayer" then
 			if not self.map.properties.delayinitobjects then
 				for _, object in pairs(layer.objects) do
