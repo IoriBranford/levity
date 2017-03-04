@@ -1,4 +1,6 @@
 local levity
+local Object = require "levity.object"
+local Tiles = require "levity.tiles"
 
 --- @table DynamicLayer
 -- @field type "dynamiclayer"
@@ -8,6 +10,7 @@ local levity
 -- @field addObject dynamicObjectLayer_addObject
 -- @field update dynamicObjectLayer_update
 -- @field draw dynamicObjectLayer_draw
+-- @field map
 -- @see ObjectLayer
 
 local Layer = {}
@@ -53,9 +56,10 @@ local function objectIsAbove(object1, object2)
 end
 
 local function dynamicObjectLayer_update(layer, dt)
+	levity = require "levity" --TEMP
 	local numnewobj = #layer.newobjects
 	for i = 1, numnewobj do
-		levity:initObject(layer.newobjects[i], layer)
+		Object.initObject(layer.newobjects[i], layer)
 		numnewobj = #layer.newobjects
 		assert(numnewobj <= LayerMaxNewObjects,
 			LayerAddedTooManyObjectsMessage)
@@ -84,7 +88,7 @@ local function dynamicObjectLayer_update(layer, dt)
 end
 
 local function dynamicObjectLayer_draw(layer)
-	levity = require "levity"
+	levity = require "levity" --TEMP
 	local scripts = levity.map.scripts
 	local camw = levity.map.camera.w
 	local camh = levity.map.camera.h
@@ -117,7 +121,7 @@ local function dynamicObjectLayer_draw(layer)
 			local ox = -tile.offset.x
 			local oy = -tile.offset.y + tileset.tileheight
 			local sx, sy = 1, 1
-			local flipx, flipy = levity:getGidFlip(object.gid)
+			local flipx, flipy = Tiles.getGidFlip(object.gid)
 			if flipx then
 				ox = tileset.tilewidth - ox
 				sx = -1
@@ -184,8 +188,8 @@ local function dynamicObjectLayer_draw(layer)
 	scripts:call(layer.name, "endDraw")
 end
 
-function Layer.addDynamicLayer(levity, name, i)
-	local layer = levity.map:addCustomLayer(name, i)
+function Layer.addDynamicLayer(name, i, map)
+	local layer = map:addCustomLayer(name, i)
 	layer.type = "dynamiclayer"
 	layer.newobjects = {}
 	-- why newobjects is necessary:
@@ -200,6 +204,7 @@ function Layer.addDynamicLayer(levity, name, i)
 	layer.draw = dynamicObjectLayer_draw
 	layer.offsetx = 0
 	layer.offsety = 0
+	layer.map = map
 	return layer
 end
 

@@ -34,7 +34,7 @@ function Tiles.getTileGid(levity, tilesetid, row, column)
 end
 
 function Tiles.getTileRowName(levity, gid)
-	gid = levity:getUnflippedGid(gid)
+	gid = Tiles.getUnflippedGid(gid)
 	local tileset = levity.map.tilesets[levity.map.tiles[gid].tileset]
 	local tileid = gid - tileset.firstgid
 	local row = tileid / tileset.tilecolumns
@@ -42,7 +42,7 @@ function Tiles.getTileRowName(levity, gid)
 end
 
 function Tiles.getTileColumnName(levity, gid)
-	gid = levity:getUnflippedGid(gid)
+	gid = Tiles.getUnflippedGid(gid)
 	local tileset = levity.map.tilesets[levity.map.tiles[gid].tileset]
 	local tileid = gid - tileset.firstgid
 	local column = tileid % tileset.tilecolumns
@@ -136,7 +136,7 @@ function Tiles.updateTileAnimations(levity, firstgid, numtiles, dt)
 	end
 end
 
-function Tiles.getGidFlip(levity, gid)
+function Tiles.getGidFlip(gid)
 	if not gid then
 		return false, false
 	end
@@ -144,7 +144,7 @@ function Tiles.getGidFlip(levity, gid)
 		bit.band(gid, FlipYBit) ~= 0
 end
 
-function Tiles.getUnflippedGid(levity, gid)
+function Tiles.getUnflippedGid(gid)
 	if not gid then
 		return 0
 	end
@@ -152,7 +152,7 @@ function Tiles.getUnflippedGid(levity, gid)
 	return bit.band(gid, bit.bnot(bit.bor(FlipXBit, FlipYBit)))
 end
 
-function Tiles.setGidFlip(levity, gid, flipx, flipy)
+function Tiles.setGidFlip(gid, flipx, flipy)
 	if not gid then
 		return 0
 	end

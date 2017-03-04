@@ -1,4 +1,6 @@
 local maputil = require "levity.maputil"
+local Tiles = require "levity.tiles"
+local Map
 
 --- @table DynamicObject
 -- @field body
@@ -12,24 +14,21 @@ local maputil = require "levity.maputil"
 
 local Object = {}
 
-function Object.newObjectId(levity)
-	local id = levity.map.nextobjectid
-	levity.map.nextobjectid = levity.map.nextobjectid + 1
-	return id
-end
+function Object.initObject(object, layer)
+	Map = require "levity.map"
+	local map = layer.map
 
-function Object.initObject(levity, object, layer)
 	if object.visible == nil then
 		object.visible = true
 	end
 	object.rotation = object.rotation or 0
 	object.properties = object.properties or {}
-	if levity.map.objecttypes then
-		maputil.setObjectDefaultProperties(object, levity.map.objecttypes)
+	if map.objecttypes then
+		maputil.setObjectDefaultProperties(object, map.objecttypes)
 	end
 
 	if not object.id then
-		object.id = levity:newObjectId()
+		object.id = Map.newObjectId(map)
 	end
 
 	local bodytype
@@ -37,9 +36,11 @@ function Object.initObject(levity, object, layer)
 		bodytype = "dynamic"
 	end
 
+	Object.setObjectLayer(object, layer)
+
 	local shape = nil
 	if object.gid then
-		levity:setObjectGid(object, object.gid, true, bodytype)
+		Object.setObjectGid(object, object.gid, true, bodytype)
 	else
 		local angle = math.rad(object.rotation)
 		if object.shape == "rectangle" then
@@ -68,7 +69,7 @@ function Object.initObject(levity, object, layer)
 				object.properties.loop or false, points)
 		end
 
-		object.body = love.physics.newBody(levity.map.world,
+		object.body = love.physics.newBody(map.world,
 							object.x, object.y,
 							bodytype)
 		object.body:setAngle(angle)
@@ -89,19 +90,14 @@ function Object.initObject(levity, object, layer)
 		end
 	end
 
-	local textfont = object.properties.textfont
-	if textfont then
-		levity.fonts:load(textfont)
-	end
-
-	levity:setObjectLayer(object, layer)
-	levity.map.objects[object.id] = object
-	levity.map.scripts:newScript(object.id, object.properties.script)
+	map.objects[object.id] = object
+	map.scripts:newScript(object.id, object.properties.script)
 end
 
-function Object.setObjectGid(levity, object, gid, animated, bodytype, applyfixtures)
-	local newtile = levity.map.tiles[levity:getUnflippedGid(gid)]
-	local newtileset = levity.map.tilesets[newtile.tileset]
+function Object.setObjectGid(object, gid, animated, bodytype, applyfixtures)
+	local map = object.layer.map
+	local newtile = map.tiles[Tiles.getUnflippedGid(gid)]
+	local newtileset = map.tilesets[newtile.tileset]
 	if applyfixtures == nil then
 		applyfixtures = object.body == nil or
 			newtile.tileset ~= object.tile.tileset or
@@ -138,7 +134,7 @@ function Object.setObjectGid(levity, object, gid, animated, bodytype, applyfixtu
 			object.body:setType(bodytype)
 		end
 	else
-		object.body = love.physics.newBody(levity.map.world,
+		object.body = love.physics.newBody(map.world,
 						object.x, object.y, bodytype)
 		object.body:setAngle(math.rad(object.rotation))
 		object.body:setUserData({
@@ -151,7 +147,7 @@ function Object.setObjectGid(levity, object, gid, animated, bodytype, applyfixtu
 
 	local bodyud = object.body:getUserData()
 
-	local tileset = levity.map.tilesets[object.tile.tileset]
+	local tileset = map.tilesets[object.tile.tileset]
 	local tilewidth = tileset.tilewidth
 	local tileheight = tileset.tileheight
 
@@ -159,7 +155,7 @@ function Object.setObjectGid(levity, object, gid, animated, bodytype, applyfixtu
 		local shapecx = shapeobj.x + shapeobj.width*.5
 		local shapecy = -tileheight + shapeobj.y + shapeobj.height*.5
 
-		local flipx, flipy = levity:getGidFlip(gid)
+		local flipx, flipy = Tiles.getGidFlip(gid)
 		if flipx then
 			local ox = object.tile.offset.x
 			shapecx = 2 * ox + tilewidth - shapecx
@@ -212,7 +208,7 @@ function Object.setObjectGid(levity, object, gid, animated, bodytype, applyfixtu
 	end
 end
 
-function Object.setObjectLayer(levity, object, layer)
+function Object.setObjectLayer(object, layer)
 	local function removeObject(objects)
 		for i, o in pairs(objects) do
 			if o == object then
@@ -243,28 +239,6 @@ function Object.setObjectLayer(levity, object, layer)
 		end
 	end
 	object.layer = layer
-end
-
-function Object.discardObject(levity, id)
-	levity.map.discardedobjects[id] = levity.map.objects[id]
-end
-
-function Object.cleanupObjects(levity)
-	for id, object in pairs(levity.map.discardedobjects) do
-		levity:setObjectLayer(object, nil)
-
-		if object.body then
-			object.body:destroy()
-		end
-
-		levity.map.scripts:destroyScript(id)
-
-		levity.map.objects[id] = nil
-	end
-
-	for id, _ in pairs(levity.map.discardedobjects) do
-		levity.map.discardedobjects[id] = nil
-	end
 end
 
 return Object

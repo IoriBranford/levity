@@ -1,9 +1,7 @@
 local levity
-local scripting = require "levity.scripting"
+local Layer = require "levity.layer"
+local Object = require "levity.object"
 local maputil = require "levity.maputil"
-local audio = require "levity.audio"
-local text = require "levity.text"
-local stats = require "levity.stats"
 local sti = require "sti.sti"
 
 local MaxIntScale = 4
@@ -42,64 +40,70 @@ local function camera_zoom(camera, vz)
 		camera.h + vz)
 end
 
-function Map.setNextMap(levity, nextmapfile, nextmapdata)
-	levity.nextmapfile = nextmapfile
-	levity.nextmapdata = nextmapdata or {}
-end
-
-function Map.loadNextMap(levity)
-	love.audio.stop()
-	assert(levity.nextmapfile, "Next map not set. In main.lua call levity:setNextMap to set the first map")
-	levity.mapfile = levity.nextmapfile
-
-	if levity.map then
-		if levity.map.scripts then
-			levity.map.scripts:unrequireAll()
-		end
-
-		if levity.map.world then
-			levity.map.world:destroy()
+local function collisionEvent(event, fixture, ...)
+	local ud = fixture:getBody():getUserData()
+	if ud then
+		local id = ud.id
+		if id then
+			levity.map.scripts:call(id, event, fixture, ...)
 		end
 	end
-	levity.bank = audio.newBank()
-	levity.fonts = text.newFonts()
-	levity.stats = stats.newStats()
-	levity.nextmapfile = nil
-	collectgarbage()
+end
 
-	levity.map = sti(levity.mapfile, {"box2d"})
-	levity.map.scripts = scripting.newMachine()
-	levity.map.discardedobjects = {}
-	levity.map.camera = {
+local function beginContact(fixture1, fixture2, contact)
+	collisionEvent("beginContact", fixture1, fixture2, contact)
+	collisionEvent("beginContact", fixture2, fixture1, contact)
+end
+
+local function endContact(fixture1, fixture2, contact)
+	collisionEvent("endContact", fixture1, fixture2, contact)
+	collisionEvent("endContact", fixture2, fixture1, contact)
+end
+
+local function preSolve(fixture1, fixture2, contact)
+	collisionEvent("preSolve", fixture1, fixture2, contact)
+	collisionEvent("preSolve", fixture2, fixture1, contact)
+end
+
+local function postSolve(fixture1, fixture2, contact,
+			normal1, tangent1, normal2, tangent2)
+	collisionEvent("postSolve", fixture1, fixture2, contact,
+				normal1, tangent1, normal2, tangent2)
+	collisionEvent("postSolve", fixture2, fixture1, contact,
+				normal1, tangent1, normal2, tangent2)
+end
+
+function Map.load(mapfile)
+	levity = require "levity" --TEMP
+
+	local map = sti(mapfile, {"box2d"})
+	map.discardedobjects = {}
+	map.camera = {
 		x = 0, y = 0,
 		w = love.graphics.getWidth(), h = love.graphics.getHeight(),
 		scale = 1,
 		set = camera_set,
 		zoom = camera_zoom
 	}
-	levity:initPhysics()
+	love.physics.setMeter(64)
+	map.world = love.physics.newWorld(0, 0)
+	map.world:setCallbacks(beginContact, endContact, preSolve, postSolve)
 
-	levity.map.objecttypes = maputil.loadObjectTypesFile("objecttypes.xml")
-	if levity.map.objecttypes then
-		maputil.setObjectsDefaultProperties(levity.map.objects,
-							levity.map.objecttypes)
+	map.objecttypes = maputil.loadObjectTypesFile("objecttypes.xml")
+	if map.objecttypes then
+		maputil.setObjectsDefaultProperties(map.objects,
+							map.objecttypes)
 	end
 
-	local width = levity.map.width * levity.map.tilewidth
-	local height = levity.map.height * levity.map.tileheight
+	local width = map.width * map.tilewidth
+	local height = map.height * map.tileheight
 
-	if levity.map.properties.staticsounds then
-		levity.bank:load(levity.map.properties.staticsounds, "static")
-	end
-	if levity.map.properties.streamsounds then
-		levity.bank:load(levity.map.properties.streamsounds, "stream")
-	end
-	if levity.map.properties.gravity then
-		levity.map.world:setGravity(0, levity.map.properties.gravity)
+	if map.properties.gravity then
+		map.world:setGravity(0, map.properties.gravity)
 	end
 
-	for _, tileset in ipairs(levity.map.tilesets) do
-		levity.map.tilesets[tileset.name] = tileset
+	for _, tileset in ipairs(map.tilesets) do
+		map.tilesets[tileset.name] = tileset
 
 		tileset.tilecolumns =
 			math.floor(tileset.imagewidth / tileset.tilewidth)
@@ -149,12 +153,12 @@ function Map.loadNextMap(levity)
 			local commonanimationtilegid =
 				tileset.firstgid + commonanimation
 			local commonanimationtile =
-				levity.map.tiles[commonanimationtilegid]
+				map.tiles[commonanimationtilegid]
 
 			commonanimation = commonanimationtile.animation
 
 			for i = tileset.firstgid, lastgid do
-				local tile = levity.map.tiles[i]
+				local tile = map.tiles[i]
 				if not tile.animation then
 					tile.animation = {}
 					for _, frame in ipairs(commonanimation) do
@@ -175,12 +179,12 @@ function Map.loadNextMap(levity)
 			local commoncollisiontilegid =
 				tileset.firstgid + commoncollision
 			local commoncollisiontile =
-				levity.map.tiles[commoncollisiontilegid]
+				map.tiles[commoncollisiontilegid]
 
 			commoncollision = commoncollisiontile.objectGroup
 
 			for i = tileset.firstgid, lastgid do
-				local tile = levity.map.tiles[i]
+				local tile = map.tiles[i]
 				if not tile.objectGroup then
 					tile.objectGroup = commoncollision
 				end
@@ -194,9 +198,10 @@ function Map.loadNextMap(levity)
 		end
 	end
 
-	for l = #levity.map.layers, 1, -1 do
-		local layer = levity.map.layers[l]
-		local layerdynamic = not layer.properties.static
+	for l = #map.layers, 1, -1 do
+		local layer = map.layers[l]
+		layer.map = map
+		local layerdynamic = (layer.properties.static ~= true)
 
 		if layer.objects and layerdynamic then
 			local name = layer.name
@@ -209,83 +214,54 @@ function Map.loadNextMap(levity)
 			for _, object in pairs(objects) do
 				object.layer = nil
 			end
-			levity.map:removeLayer(l)
+			map:removeLayer(l)
 
-			layer = levity:addDynamicLayer(name, l)
+			layer = Layer.addDynamicLayer(name, l, map)
+			for _, object in pairs(objects) do
+				Object.setObjectLayer(object, layer)
+			end
 
 			layer.offsetx = offsetx
 			layer.offsety = offsety
 			layer.properties = properties
 			layer.draworder = draworder
-
-			if levity.map.properties.delayinitobjects then
-				for _, object in pairs(objects) do
-					levity:setObjectLayer(object, layer)
-				end
-			else
-				for _, object in pairs(objects) do
-					levity:initObject(object, layer)
-				end
-			end
-		end
-
-		levity.map.scripts:newScript(layer.name, layer.properties.script)
-	end
-
-	levity.map:box2d_init(levity.map.world)
-
-	levity.map.scripts:newScript(levity.mapfile, levity.map.properties.script)
-
-	local intscale = math.min(math.floor(levity.map.camera.scale), MaxIntScale)
-	levity.map:resize(levity.map.camera.w * intscale,
-			levity.map.camera.h * intscale)
-	levity.map.canvas:setFilter("linear", "linear")
-	collectgarbage()
-
-	levity.map.paused = false
-	levity.maxdt = 1/16
-	levity.timescale = 1
-	return levity.map
-end
-
-local function collisionEvent(event, fixture, ...)
-	local ud = fixture:getBody():getUserData()
-	if ud then
-		local id = ud.id
-		if id then
-			levity = require "levity"
-			levity.map.scripts:call(id, event, fixture, ...)
 		end
 	end
+
+	local intscale = math.min(math.floor(map.camera.scale), MaxIntScale)
+	map:resize(map.camera.w * intscale, map.camera.h * intscale)
+	map.canvas:setFilter("linear", "linear")
+
+	map.paused = false
+	return map
 end
 
-local function beginContact(fixture1, fixture2, contact)
-	collisionEvent("beginContact", fixture1, fixture2, contact)
-	collisionEvent("beginContact", fixture2, fixture1, contact)
+function Map.newObjectId(map)
+	local id = map.nextobjectid
+	map.nextobjectid = map.nextobjectid + 1
+	return id
 end
 
-local function endContact(fixture1, fixture2, contact)
-	collisionEvent("endContact", fixture1, fixture2, contact)
-	collisionEvent("endContact", fixture2, fixture1, contact)
+function Map.discardObject(map, id)
+	map.discardedobjects[id] = map.objects[id]
 end
 
-local function preSolve(fixture1, fixture2, contact)
-	collisionEvent("preSolve", fixture1, fixture2, contact)
-	collisionEvent("preSolve", fixture2, fixture1, contact)
-end
+function Map.cleanupObjects(map)
+	for id, object in pairs(map.discardedobjects) do
+		Object.setObjectLayer(object, nil)
 
-local function postSolve(fixture1, fixture2, contact,
-			normal1, tangent1, normal2, tangent2)
-	collisionEvent("postSolve", fixture1, fixture2, contact,
-				normal1, tangent1, normal2, tangent2)
-	collisionEvent("postSolve", fixture2, fixture1, contact,
-				normal1, tangent1, normal2, tangent2)
-end
+		if object.body then
+			object.body:destroy()
+		end
 
-function Map.initPhysics(levity)
-	love.physics.setMeter(64)
-	levity.map.world = love.physics.newWorld(0, 0)
-	levity.map.world:setCallbacks(beginContact, endContact, preSolve, postSolve)
+		map.scripts:destroyScript(id)
+
+		map.objects[id] = nil
+	end
+
+	for id, _ in pairs(map.discardedobjects) do
+		map.discardedobjects[id] = nil
+	end
 end
 
 return Map

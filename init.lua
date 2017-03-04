@@ -3,6 +3,13 @@ love.filesystem.setRequirePath(
 	"levity/pl/lua/?/init.lua;"..
 	love.filesystem.getRequirePath())
 
+local scripting = require "levity.scripting"
+local audio = require "levity.audio"
+local text = require "levity.text"
+local stats = require "levity.stats"
+local Object = require "levity.object"
+local Map = require "levity.map"
+
 require "levity.xcoroutine"
 require "levity.xmath"
 require "levity.class"
@@ -22,9 +29,73 @@ local MaxIntScale = 4
 
 local levity = {}
 for _, modulename in pairs({"map", "layer", "object", "tiles"}) do
-	for fname, f in pairs(require("levity."..modulename)) do
+	local module = require("levity."..modulename)
+	for fname, f in pairs(module) do
 		levity[fname] = f
 	end
+end
+
+function levity:setNextMap(nextmapfile, nextmapdata)
+	self.nextmapfile = nextmapfile
+	self.nextmapdata = nextmapdata or {}
+end
+
+function levity:loadNextMap()
+	love.audio.stop()
+
+	self.mapfile = self.nextmapfile
+
+	if self.map then
+		if self.map.scripts then
+			self.map.scripts:unrequireAll()
+		end
+
+		if self.map.world then
+			self.map.world:destroy()
+		end
+	end
+	self.bank = audio.newBank()
+	self.fonts = text.newFonts()
+	self.stats = stats.newStats()
+	self.nextmapfile = nil
+	collectgarbage()
+
+	self.map = Map.load(self.mapfile)
+
+	self.map.scripts = scripting.newMachine()
+	for _, layer in pairs(self.map.layers) do
+		if layer.type == "dynamiclayer" then
+			if not self.map.properties.delayinitobjects then
+				for _, object in pairs(layer.objects) do
+					Object.initObject(object, layer)
+
+					local textfont =
+						object.properties.textfont
+
+					if textfont then
+						levity.fonts:load(textfont)
+					end
+				end
+			end
+		end
+
+		self.map.scripts:newScript(layer.name, layer.properties.script)
+	end
+
+	self.map:box2d_init(self.map.world)
+
+	self.map.scripts:newScript(self.mapfile, self.map.properties.script)
+
+	if self.map.properties.staticsounds then
+		self.bank:load(self.map.properties.staticsounds, "static")
+	end
+	if self.map.properties.streamsounds then
+		self.bank:load(self.map.properties.streamsounds, "stream")
+	end
+
+	self.maxdt = 1/16
+	self.timescale = 1
+	collectgarbage()
 end
 
 function levity:update(dt)
@@ -48,7 +119,7 @@ function levity:update(dt)
 		self.bank:update(dt)
 	end
 
-	self:cleanupObjects()
+	Map.cleanupObjects(self.map)
 	collectgarbage("step", 1)
 
 	self.stats:update(dt)
@@ -145,6 +216,9 @@ function levity:screenToCamera(x, y)
 		(y - love.graphics.getHeight()*.5)/scale + self.map.camera.h*.5
 end
 
+local NoFirstMapMessage =
+"First map not set. In main.lua call levity:setNextMap to set the first map"
+
 function love.load()
 	for a, ar in ipairs(arg) do
 		if ar == "-debug" then
@@ -159,6 +233,7 @@ function love.load()
 		end
 	end
 
+	assert(levity.nextmapfile, NoFirstMapMessage)
 	love.joystick.loadGamepadMappings("levity/gamecontrollerdb.txt")
 	levity:loadNextMap()
 
