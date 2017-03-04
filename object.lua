@@ -1,6 +1,5 @@
 local maputil = require "levity.maputil"
 local Tiles = require "levity.tiles"
-local Map
 
 --- @table DynamicObject
 -- @field body
@@ -13,9 +12,11 @@ local Map
 -- @see Object
 
 local Object = {}
+Object.__index = Object
 
-function Object.initObject(object, layer)
-	Map = require "levity.map"
+function Object.init(object, layer)
+	object = setmetatable(object, Object)
+
 	local map = layer.map
 
 	if object.visible == nil then
@@ -28,7 +29,7 @@ function Object.initObject(object, layer)
 	end
 
 	if not object.id then
-		object.id = Map.newObjectId(map)
+		object.id = map:newObjectId()
 	end
 
 	local bodytype
@@ -36,11 +37,11 @@ function Object.initObject(object, layer)
 		bodytype = "dynamic"
 	end
 
-	Object.setObjectLayer(object, layer)
+	Object.setLayer(object, layer)
 
 	local shape = nil
 	if object.gid then
-		Object.setObjectGid(object, object.gid, true, bodytype)
+		object:setGid(object.gid, true, bodytype)
 	else
 		local angle = math.rad(object.rotation)
 		if object.shape == "rectangle" then
@@ -94,7 +95,7 @@ function Object.initObject(object, layer)
 	map.scripts:newScript(object.id, object.properties.script)
 end
 
-function Object.setObjectGid(object, gid, animated, bodytype, applyfixtures)
+function Object.setGid(object, gid, animated, bodytype, applyfixtures)
 	local map = object.layer.map
 	local newtile = map.tiles[Tiles.getUnflippedGid(gid)]
 	local newtileset = map.tilesets[newtile.tileset]
@@ -208,7 +209,7 @@ function Object.setObjectGid(object, gid, animated, bodytype, applyfixtures)
 	end
 end
 
-function Object.setObjectLayer(object, layer)
+function Object.setLayer(object, layer)
 	local function removeObject(objects)
 		for i, o in pairs(objects) do
 			if o == object then

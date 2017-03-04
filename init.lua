@@ -28,12 +28,6 @@ local MaxIntScale = 4
 -- @field nextmapdata
 
 local levity = {}
-for _, modulename in pairs({"map", "layer", "object", "tiles"}) do
-	local module = require("levity."..modulename)
-	for fname, f in pairs(module) do
-		levity[fname] = f
-	end
-end
 
 function levity:setNextMap(nextmapfile, nextmapdata)
 	self.nextmapfile = nextmapfile
@@ -60,21 +54,58 @@ function levity:loadNextMap()
 	self.nextmapfile = nil
 	collectgarbage()
 
-	self.map = Map.load(self.mapfile)
+	self.map = Map(self.mapfile)
+
+	local function collisionEvent(event, fixture, ...)
+		local ud = fixture:getBody():getUserData()
+		if ud then
+			local id = ud.id
+			if id then
+				self.map.scripts:call(id, event, fixture, ...)
+			end
+		end
+	end
+
+	local function beginContact(fixture1, fixture2, contact)
+		collisionEvent("beginContact", fixture1, fixture2, contact)
+		collisionEvent("beginContact", fixture2, fixture1, contact)
+	end
+
+	local function endContact(fixture1, fixture2, contact)
+		collisionEvent("endContact", fixture1, fixture2, contact)
+		collisionEvent("endContact", fixture2, fixture1, contact)
+	end
+
+	local function preSolve(fixture1, fixture2, contact)
+		collisionEvent("preSolve", fixture1, fixture2, contact)
+		collisionEvent("preSolve", fixture2, fixture1, contact)
+	end
+
+	local function postSolve(fixture1, fixture2, contact,
+				normal1, tangent1, normal2, tangent2)
+		collisionEvent("postSolve", fixture1, fixture2, contact,
+				normal1, tangent1, normal2, tangent2)
+		collisionEvent("postSolve", fixture2, fixture1, contact,
+				normal1, tangent1, normal2, tangent2)
+	end
+
+	love.physics.setMeter(64)
+	self.map.world = love.physics.newWorld(0, 0)
+	self.map.world:setCallbacks(beginContact, endContact, preSolve, postSolve)
 
 	self.map.scripts = scripting.newMachine()
 	for _, layer in ipairs(self.map.layers) do
-		if layer.type == "dynamiclayer" then
+		if layer.objects and layer.type == "dynamiclayer" then
 			if not self.map.properties.delayinitobjects then
 				for _, object in pairs(layer.objects) do
-					Object.initObject(object, layer)
+					Object.init(object, layer)
+				end
+			end
+			for _, object in pairs(layer.objects) do
+				local textfont = object.properties.textfont
 
-					local textfont =
-						object.properties.textfont
-
-					if textfont then
-						levity.fonts:load(textfont)
-					end
+				if textfont then
+					self.fonts:load(textfont)
 				end
 			end
 		end
@@ -119,7 +150,7 @@ function levity:update(dt)
 		self.bank:update(dt)
 	end
 
-	Map.cleanupObjects(self.map)
+	self.map:cleanupObjects()
 	collectgarbage("step", 1)
 
 	self.stats:update(dt)

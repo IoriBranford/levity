@@ -1,7 +1,7 @@
-local levity
 local Layer = require "levity.layer"
 local Object = require "levity.object"
-local maputil = require "levity.maputil"
+local Tiles = require "levity.tiles"
+local maputil = require "maputil"
 local sti = require "sti.sti"
 
 local MaxIntScale = 4
@@ -15,6 +15,161 @@ local MaxIntScale = 4
 -- @field paused
 
 local Map = {}
+
+function Map.getTileGid(map, tilesetid, row, column)
+	local tileset = map.tilesets[tilesetid]
+	if not tileset then
+		return nil
+	end
+
+	local tileid
+
+	if not column then
+		tileid = row
+		if type(tileid) == "string" then
+			tileid = tileset.namedtileids[tileid]
+		end
+	elseif row then
+		if type(column) == "string" then
+			column = tileset.namedcols[column]
+		end
+
+		if type(row) == "string" then
+			row = tileset.namedrows[row]
+		end
+
+		tileid = row * tileset.tilecolumns + column
+	end
+
+	return tileset.firstgid + tileid
+end
+
+function Map.getTileRowName(map, gid)
+	gid = Tiles.getUnflippedGid(gid)
+	local tileset = map.tilesets[map.tiles[gid].tileset]
+	local tileid = gid - tileset.firstgid
+	local row = tileid / tileset.tilecolumns
+	return tileset.rownames[row] or math.floor(row)
+end
+
+function Map.getTileColumnName(map, gid)
+	gid = Tiles.getUnflippedGid(gid)
+	local tileset = map.tilesets[map.tiles[gid].tileset]
+	local tileid = gid - tileset.firstgid
+	local column = tileid % tileset.tilecolumns
+	return tileset.columnnames[column] or column
+end
+
+function Map.getTileset(map, tilesetid)
+	return map.tilesets[tilesetid]
+end
+
+function Map.getTile(map, tilesetid, tileid)
+	return map.tiles[tileid + map.tilesets[tilesetid].firstgid]
+end
+
+function Map.getTilesetImage(map, tilesetid)
+	return map.tilesets[tilesetid].image
+end
+
+--- Convert list of map-specific gids to map-agnostic names
+-- @param gids list
+-- @return List of name tables: { {tileset, row, column}, ... }
+function Map.tileGidsToNames(map, gids)
+	if not gids then
+		return nil
+	end
+	local names = {}
+	for _, gid in ipairs(gids) do
+		local tileset = map.tilesets[map.tiles[gid].tileset]
+
+		names[#names + 1] = {
+			tileset = tileset.name,
+			row = map:getTileRowName(gid),
+			column = map:getTileColumnName(gid)
+		}
+	end
+	return names
+end
+
+--- Convert name tables to gids for current map
+-- @param names list returned by tileGidsToNames
+-- @return List of tile gids
+function Map.tileNamesToGids(map, names)
+	if not names then
+		return nil
+	end
+	local gids = {}
+	for _, name in ipairs(names) do
+		gids[#gids + 1] = map:getTileGid(name.tileset,
+						name.row, name.column)
+	end
+	return gids
+end
+
+function Map.updateTilesetAnimations(map, tileset, dt)
+	if type(tileset) ~= "table" then
+		tileset = map.tilesets[tileset]
+	end
+	map:updateTileAnimations(tileset.firstgid, tileset.tilecount, dt)
+end
+
+function Map.updateTileAnimations(map, firstgid, numtiles, dt)
+	local tiles = map.tiles
+	local tilesets = map.tilesets
+	local tileinstances = map.tileInstances
+
+	for gid = firstgid, firstgid + numtiles - 1 do
+		local tile = tiles[gid]
+		if tile and tile.animation then
+			local update = false
+			tile.time = tile.time + dt * 1000
+
+			while tile.time > (tile.animation[tile.frame].duration) do
+				update     = true
+				tile.time  = tile.time  - (tile.animation[tile.frame].duration)
+				tile.frame = tile.frame + 1
+
+				if tile.frame > #tile.animation then tile.frame = 1 end
+			end
+
+			if update and tileinstances[tile.gid] then
+				for _, j in pairs(tileinstances[tile.gid]) do
+					local t = tiles[(tile.animation[tile.frame].tileid) + tilesets[tile.tileset].firstgid]
+					j.batch:set(j.id, t.quad, j.x, j.y, j.r, tile.sx, tile.sy, 0, j.oy)
+				end
+			end
+		end
+	end
+end
+
+function Map.newObjectId(map)
+	local id = map.nextobjectid
+	map.nextobjectid = map.nextobjectid + 1
+	return id
+end
+
+function Map.discardObject(map, id)
+	map.discardedobjects[id] = map.objects[id]
+end
+
+function Map.cleanupObjects(map)
+	for id, object in pairs(map.discardedobjects) do
+		Object.setLayer(object, nil)
+
+		if object.body then
+			object.body:destroy()
+		end
+
+		map.scripts:destroyScript(id)
+
+		map.objects[id] = nil
+	end
+
+	for id, _ in pairs(map.discardedobjects) do
+		map.discardedobjects[id] = nil
+	end
+end
 
 local function camera_set(camera, cx, cy, w, h)
 	if w then
@@ -40,43 +195,12 @@ local function camera_zoom(camera, vz)
 		camera.h + vz)
 end
 
-local function collisionEvent(event, fixture, ...)
-	local ud = fixture:getBody():getUserData()
-	if ud then
-		local id = ud.id
-		if id then
-			levity.map.scripts:call(id, event, fixture, ...)
-		end
-	end
-end
-
-local function beginContact(fixture1, fixture2, contact)
-	collisionEvent("beginContact", fixture1, fixture2, contact)
-	collisionEvent("beginContact", fixture2, fixture1, contact)
-end
-
-local function endContact(fixture1, fixture2, contact)
-	collisionEvent("endContact", fixture1, fixture2, contact)
-	collisionEvent("endContact", fixture2, fixture1, contact)
-end
-
-local function preSolve(fixture1, fixture2, contact)
-	collisionEvent("preSolve", fixture1, fixture2, contact)
-	collisionEvent("preSolve", fixture2, fixture1, contact)
-end
-
-local function postSolve(fixture1, fixture2, contact,
-			normal1, tangent1, normal2, tangent2)
-	collisionEvent("postSolve", fixture1, fixture2, contact,
-				normal1, tangent1, normal2, tangent2)
-	collisionEvent("postSolve", fixture2, fixture1, contact,
-				normal1, tangent1, normal2, tangent2)
-end
-
-function Map.load(mapfile)
-	levity = require "levity" --TEMP
-
+local function newMap(mapfile)
 	local map = sti(mapfile, {"box2d"})
+	for fname, f in pairs(Map) do
+		map[fname] = f
+	end
+
 	map.discardedobjects = {}
 	map.camera = {
 		x = 0, y = 0,
@@ -85,9 +209,6 @@ function Map.load(mapfile)
 		set = camera_set,
 		zoom = camera_zoom
 	}
-	love.physics.setMeter(64)
-	map.world = love.physics.newWorld(0, 0)
-	map.world:setCallbacks(beginContact, endContact, preSolve, postSolve)
 
 	map.objecttypes = maputil.loadObjectTypesFile("objecttypes.xml")
 	if map.objecttypes then
@@ -216,9 +337,9 @@ function Map.load(mapfile)
 			end
 			map:removeLayer(l)
 
-			layer = Layer.addDynamicLayer(name, l, map)
+			layer = Layer(map, name, l)
 			for _, object in pairs(objects) do
-				Object.setObjectLayer(object, layer)
+				Object.setLayer(object, layer)
 			end
 
 			layer.offsetx = offsetx
@@ -233,35 +354,8 @@ function Map.load(mapfile)
 	map.canvas:setFilter("linear", "linear")
 
 	map.paused = false
+
 	return map
 end
 
-function Map.newObjectId(map)
-	local id = map.nextobjectid
-	map.nextobjectid = map.nextobjectid + 1
-	return id
-end
-
-function Map.discardObject(map, id)
-	map.discardedobjects[id] = map.objects[id]
-end
-
-function Map.cleanupObjects(map)
-	for id, object in pairs(map.discardedobjects) do
-		Object.setObjectLayer(object, nil)
-
-		if object.body then
-			object.body:destroy()
-		end
-
-		map.scripts:destroyScript(id)
-
-		map.objects[id] = nil
-	end
-
-	for id, _ in pairs(map.discardedobjects) do
-		map.discardedobjects[id] = nil
-	end
-end
-
-return Map
+return newMap

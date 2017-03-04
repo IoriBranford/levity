@@ -1,4 +1,3 @@
-local levity
 local Object = require "levity.object"
 local Tiles = require "levity.tiles"
 
@@ -14,6 +13,7 @@ local Tiles = require "levity.tiles"
 -- @see ObjectLayer
 
 local Layer = {}
+Layer.__index = Layer
 
 local function dynamicObject_updateAnimation(object, dt)
 	local animation = object.animation
@@ -34,15 +34,15 @@ local function dynamicObject_updateAnimation(object, dt)
 
 	if advanceframe then
 		local tileid = (animation[object.aniframe].tileid)
-		object.tile = levity:getMapTile(object.tile.tileset, tileid)
+		object.tile = object.layer.map:getTile(object.tile.tileset, tileid)
 	end
 
 	if looped then
-		levity.map.scripts:call(object.id, "loopedAnimation")
+		object.layer.map.scripts:call(object.id, "loopedAnimation")
 	end
 end
 
-local function dynamicObjectLayer_addObject(layer, object)
+function Layer.addObject(layer, object)
 	layer.newobjects[#layer.newobjects + 1] = object
 end
 
@@ -55,11 +55,10 @@ local function objectIsAbove(object1, object2)
 	return object1.y < object2.y
 end
 
-local function dynamicObjectLayer_update(layer, dt)
-	levity = require "levity" --TEMP
+function Layer.update(layer, dt)
 	local numnewobj = #layer.newobjects
 	for i = 1, numnewobj do
-		Object.initObject(layer.newobjects[i], layer)
+		Object.init(layer.newobjects[i], layer)
 		numnewobj = #layer.newobjects
 		assert(numnewobj <= LayerMaxNewObjects,
 			LayerAddedTooManyObjectsMessage)
@@ -87,17 +86,18 @@ local function dynamicObjectLayer_update(layer, dt)
 	end
 end
 
-local function dynamicObjectLayer_draw(layer)
-	levity = require "levity" --TEMP
-	local scripts = levity.map.scripts
-	local camw = levity.map.camera.w
-	local camh = levity.map.camera.h
-	local camcx = levity.map.camera.x + camw*.5
-	local camcy = levity.map.camera.y + camh*.5
-	local tilesets = levity.map.tilesets
+local levity
+function Layer.draw(layer)
+	levity = levity or require "levity" --TEMP
+	local scripts = layer.map.scripts
+	local camw = layer.map.camera.w
+	local camh = layer.map.camera.h
+	local camcx = layer.map.camera.x + camw*.5
+	local camcy = layer.map.camera.y + camh*.5
+	local tilesets = layer.map.tilesets
 	local fonts = levity.fonts
 
-	local function draw(object)
+	local function dynamicObject_draw(object)
 		if object.visible == false then
 			return
 		end
@@ -182,14 +182,20 @@ local function dynamicObjectLayer_draw(layer)
 	love.graphics.push()
 	love.graphics.translate(layer.offsetx, layer.offsety)
 	for _, object in ipairs(layer.spriteobjects) do
-		draw(object)
+		dynamicObject_draw(object)
 	end
 	love.graphics.pop()
 	scripts:call(layer.name, "endDraw")
 end
 
-function Layer.addDynamicLayer(name, i, map)
+local function newLayer(map, name, i)
 	local layer = map:addCustomLayer(name, i)
+	--TODO: Why doesn't setting metatable work here?
+	--setmetatable(layer, Layer)
+	for fname, f in pairs(Layer) do
+		layer[fname] = f
+	end
+
 	layer.type = "dynamiclayer"
 	layer.newobjects = {}
 	-- why newobjects is necessary:
@@ -199,13 +205,11 @@ function Layer.addDynamicLayer(name, i, map)
 	-- table [i.e. a new object]."
 	layer.objects = {}
 	layer.spriteobjects = {}
-	layer.addObject = dynamicObjectLayer_addObject
-	layer.update = dynamicObjectLayer_update
-	layer.draw = dynamicObjectLayer_draw
 	layer.offsetx = 0
 	layer.offsety = 0
 	layer.map = map
+
 	return layer
 end
 
-return Layer
+return newLayer
