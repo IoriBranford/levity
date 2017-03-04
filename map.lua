@@ -1,7 +1,7 @@
 local Layer = require "levity.layer"
 local Object = require "levity.object"
 local Tiles = require "levity.tiles"
-local maputil = require "maputil"
+local maputil = require "levity.maputil"
 local sti = require "sti.sti"
 
 local MaxIntScale = 4
