@@ -39,6 +39,8 @@ function MapUtil.loadObjectTypesFile(filename)
 				properties[property] = false
 			elseif value.type == "int" or value.type == "float" then
 				properties[property] = tonumber(value.value)
+			else
+				properties[property] = value.value
 			end
 		end
 	end

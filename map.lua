@@ -349,10 +349,6 @@ local function newMap(mapfile)
 		end
 	end
 
-	local intscale = math.min(math.floor(map.camera.scale), MaxIntScale)
-	map:resize(map.camera.w * intscale, map.camera.h * intscale)
-	map.canvas:setFilter("linear", "linear")
-
 	map.paused = false
 
 	return map

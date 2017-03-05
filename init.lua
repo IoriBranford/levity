@@ -124,6 +124,10 @@ function levity:loadNextMap()
 		self.bank:load(self.map.properties.streamsounds, "stream")
 	end
 
+	local intscale = math.min(math.floor(self.map.camera.scale), MaxIntScale)
+	self.map:resize(self.map.camera.w * intscale, self.map.camera.h * intscale)
+	self.map.canvas:setFilter("linear", "linear")
+
 	self.maxdt = 1/16
 	self.timescale = 1
 	collectgarbage()
