@@ -92,7 +92,7 @@ function Object.init(object, layer)
 	end
 
 	map.objects[object.id] = object
-	map.scripts:newScript(object.id, object.properties.script)
+	map.scripts:newScript(object.id, object.properties.script, object)
 end
 
 function Object.setGid(object, gid, animated, bodytype, applyfixtures)

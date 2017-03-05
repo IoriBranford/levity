@@ -58,13 +58,13 @@ end
 -- @param id A key by which to reference the script instance
 -- @param name Name of script class
 -- @return The new script instance
-function Machine:newScript(id, name, ...)
+function Machine:newScript(id, name, object, ...)
 	local script
 	if name then
 		local scriptclass = require(name)
 			--self:requireScript(name)
 		self.classes[name] = scriptclass
-		script = scriptclass(id, ...)
+		script = scriptclass(object, ...)
 
 		for event, func in pairs(scriptclass) do
 			if type(func) == "function" then

@@ -110,12 +110,14 @@ function levity:loadNextMap()
 			end
 		end
 
-		self.map.scripts:newScript(layer.name, layer.properties.script)
+		self.map.scripts:newScript(layer.name, layer.properties.script,
+						layer)
 	end
 
 	self.map:box2d_init(self.map.world)
 
-	self.map.scripts:newScript(self.mapfile, self.map.properties.script)
+	self.map.scripts:newScript(self.mapfile, self.map.properties.script,
+					self.map)
 
 	if self.map.properties.staticsounds then
 		self.bank:load(self.map.properties.staticsounds, "static")
