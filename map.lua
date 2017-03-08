@@ -1,8 +1,10 @@
+local levity
+local scripting = require "levity.scripting"
+local maputil = require "levity.maputil"
+local sti = require "sti.sti"
 local Layer = require "levity.layer"
 local Object = require "levity.object"
 local Tiles = require "levity.tiles"
-local maputil = require "levity.maputil"
-local sti = require "sti.sti"
 
 local MaxIntScale = 4
 
@@ -15,6 +17,7 @@ local MaxIntScale = 4
 -- @field paused
 
 local Map = {}
+-- Still want STI Map functions, so do not use class or metatable.
 
 function Map.getTileGid(map, tilesetid, row, column)
 	local tileset = map.tilesets[tilesetid]
@@ -169,6 +172,75 @@ function Map.cleanupObjects(map)
 	for id, _ in pairs(map.discardedobjects) do
 		map.discardedobjects[id] = nil
 	end
+
+	if map.overlaymap then
+		map.overlaymap:cleanupObjects()
+	end
+end
+
+function Map.broadcast(map, event, ...)
+	map.scripts:broadcast(event, ...)
+	if map.overlaymap then
+		map.overlaymap:broadcast(event, ...)
+	end
+end
+
+function Map.update(map, dt)
+	map.scripts:clearLogs()
+
+	if map.paused then
+	else
+		map.scripts:broadcast("beginMove", dt)
+		map.world:update(dt)
+		map.scripts:broadcast("endMove", dt)
+
+		for _, layer in ipairs(map.layers) do
+			layer:update(dt)
+		end
+		map.scripts:printLogs()
+	end
+
+	map:cleanupObjects()
+
+	if map.overlaymap then
+		map.overlaymap:update(dt)
+	end
+end
+
+function Map.draw(map)
+	local cx, cy = map.camera.x, map.camera.y
+	local cw, ch = map.camera.w, map.camera.h
+	local ccx, ccy = cx+cw*.5, cy+ch*.5
+
+	local scale = map.camera.scale
+	local intscale = math.min(math.floor(scale), MaxIntScale)
+
+	love.graphics.push()
+	love.graphics.translate(-(cx * intscale),
+				-(cy * intscale))
+	love.graphics.scale(intscale, intscale)
+
+	map.scripts:call(map.name, "beginDraw")
+	for _, layer in ipairs(map.layers) do
+		if layer.visible and layer.opacity > 0 then
+			map:drawLayer(layer)
+		end
+	end
+	map.scripts:call(map.name, "endDraw")
+	love.graphics.pop()
+
+	if map.overlaymap then
+		map.overlaymap:draw()
+	end
+end
+
+function Map.destroy(map)
+	map.scripts:unrequireAll()
+	map.world:destroy()
+	if map.overlaymap then
+		map.overlaymap:destroy()
+	end
+	sti:flush()
 end
 
 local function camera_set(camera, cx, cy, w, h)
@@ -195,12 +267,167 @@ local function camera_zoom(camera, vz)
 		camera.h + vz)
 end
 
+local function initTileset(tileset, tiles)
+	tileset.tilecolumns =
+		math.floor(tileset.imagewidth / tileset.tilewidth)
+
+	tileset.namedtileids = {}
+	tileset.namedrows = {}
+	tileset.namedcols = {}
+	tileset.rownames = {}
+	tileset.columnnames = {}
+	--tileset.tilenames = {}
+
+	for p, v in pairs(tileset.properties) do
+		if string.find(p, "rowname") == 1 then
+			local num = tonumber(string.sub(p, 8))
+			tileset.rownames[num] = v
+			tileset.namedrows[v] = num
+		elseif string.find(p, "colname") == 1 then
+			local num = tonumber(string.sub(p, 8))
+			tileset.columnnames[num] = v
+			tileset.namedcols[v] = num
+		elseif string.find(p, "row_") == 1 then
+			local name = string.sub(p, 5)
+			tileset.rownames[v] = name
+			tileset.namedrows[name] = v
+		elseif string.find(p, "column_") == 1 then
+			local name = string.sub(p, 8)
+			tileset.columnnames[v] = name
+			tileset.namedcols[name] = v
+		end
+	end
+
+	for _, tile in pairs(tileset.tiles) do
+		if tile.properties then
+			local name = tile.properties.name
+			if name then
+				--tileset.tilenames[tile.id] = tilename
+				tileset.namedtileids[name] = tile.id
+			end
+		end
+	end
+
+	local lastgid = tileset.firstgid + tileset.tilecount - 1
+
+	local commonanimation = tileset.properties.commonanimation
+
+	if commonanimation then
+		local commonanimationtilegid =
+			tileset.firstgid + commonanimation
+		local commonanimationtile =
+			tiles[commonanimationtilegid]
+
+		commonanimation = commonanimationtile.animation
+
+		for i = tileset.firstgid, lastgid do
+			local tile = tiles[i]
+			if not tile.animation then
+				tile.animation = {}
+				for _, frame in ipairs(commonanimation) do
+					local tileid = tile.id + (frame.tileid)
+
+					table.insert(tile.animation, {
+						tileid = tostring(tileid),
+						duration = frame.duration
+					})
+				end
+			end
+		end
+	end
+
+	local commoncollision = tileset.properties.commoncollision
+
+	if commoncollision then
+		local commoncollisiontilegid =
+			tileset.firstgid + commoncollision
+		local commoncollisiontile =
+			tiles[commoncollisiontilegid]
+
+		commoncollision = commoncollisiontile.objectGroup
+
+		for i = tileset.firstgid, lastgid do
+			local tile = tiles[i]
+			if not tile.objectGroup then
+				tile.objectGroup = commoncollision
+			end
+		end
+	end
+end
+
+local function initPhysics(map)
+	map.world = love.physics.newWorld(0, map.properties.gravity or 0)
+
+	local function collisionEvent(event, fixture, ...)
+		local ud = fixture:getBody():getUserData()
+		if ud then
+			local id = ud.id
+			if id then
+				map.scripts:call(id, event, fixture, ...)
+			end
+		end
+	end
+
+	local function beginContact(fixture1, fixture2, contact)
+		collisionEvent("beginContact", fixture1, fixture2, contact)
+		collisionEvent("beginContact", fixture2, fixture1, contact)
+	end
+
+	local function endContact(fixture1, fixture2, contact)
+		collisionEvent("endContact", fixture1, fixture2, contact)
+		collisionEvent("endContact", fixture2, fixture1, contact)
+	end
+
+	local function preSolve(fixture1, fixture2, contact)
+		collisionEvent("preSolve", fixture1, fixture2, contact)
+		collisionEvent("preSolve", fixture2, fixture1, contact)
+	end
+
+	local function postSolve(fixture1, fixture2, contact,
+				normal1, tangent1, normal2, tangent2)
+		collisionEvent("postSolve", fixture1, fixture2, contact,
+				normal1, tangent1, normal2, tangent2)
+		collisionEvent("postSolve", fixture2, fixture1, contact,
+				normal1, tangent1, normal2, tangent2)
+	end
+
+	map.world:setCallbacks(beginContact, endContact, preSolve, postSolve)
+
+	map:box2d_init(map.world)
+end
+
+function Map.initScripts(map)
+	map.scripts = scripting.newMachine()
+	for i = 1, #map.layers do
+		local layer = map.layers[i]
+
+		if layer.objects and layer.type == "dynamiclayer" then
+			if not map.properties.delayinitobjects then
+				for _, object in pairs(layer.objects) do
+					Object.init(object, layer)
+				end
+			end
+		end
+
+		map.scripts:newScript(layer.name, layer.properties.script, layer)
+	end
+
+	map.scripts:newScript(map.name, map.properties.script, map)
+
+	if map.overlaymap then
+		map.overlaymap:initScripts()
+	end
+end
+
 local function newMap(mapfile)
+	levity = require "levity"
+
 	local map = sti(mapfile, {"box2d"})
 	for fname, f in pairs(Map) do
 		map[fname] = f
 	end
 
+	map.name = mapfile
 	map.discardedobjects = {}
 	map.camera = {
 		x = 0, y = 0,
@@ -209,6 +436,7 @@ local function newMap(mapfile)
 		set = camera_set,
 		zoom = camera_zoom
 	}
+	map.paused = false
 
 	map.objecttypes = maputil.loadObjectTypesFile("objecttypes.xml")
 	if map.objecttypes then
@@ -219,104 +447,9 @@ local function newMap(mapfile)
 	local width = map.width * map.tilewidth
 	local height = map.height * map.tileheight
 
-	if map.properties.gravity then
-		map.world:setGravity(0, map.properties.gravity)
-	end
-
 	for _, tileset in ipairs(map.tilesets) do
 		map.tilesets[tileset.name] = tileset
-
-		tileset.tilecolumns =
-			math.floor(tileset.imagewidth / tileset.tilewidth)
-
-		tileset.namedtileids = {}
-		tileset.namedrows = {}
-		tileset.namedcols = {}
-		tileset.rownames = {}
-		tileset.columnnames = {}
-		--tileset.tilenames = {}
-
-		for p, v in pairs(tileset.properties) do
-			if string.find(p, "rowname") == 1 then
-				local num = tonumber(string.sub(p, 8))
-				tileset.rownames[num] = v
-				tileset.namedrows[v] = num
-			elseif string.find(p, "colname") == 1 then
-				local num = tonumber(string.sub(p, 8))
-				tileset.columnnames[num] = v
-				tileset.namedcols[v] = num
-			elseif string.find(p, "row_") == 1 then
-				local name = string.sub(p, 5)
-				tileset.rownames[v] = name
-				tileset.namedrows[name] = v
-			elseif string.find(p, "column_") == 1 then
-				local name = string.sub(p, 8)
-				tileset.columnnames[v] = name
-				tileset.namedcols[name] = v
-			end
-		end
-
-		for _, tile in pairs(tileset.tiles) do
-			if tile.properties then
-				local name = tile.properties.name
-				if name then
-					--tileset.tilenames[tile.id] = tilename
-					tileset.namedtileids[name] = tile.id
-				end
-			end
-		end
-
-		local lastgid = tileset.firstgid + tileset.tilecount - 1
-
-		local commonanimation = tileset.properties.commonanimation
-
-		if commonanimation then
-			local commonanimationtilegid =
-				tileset.firstgid + commonanimation
-			local commonanimationtile =
-				map.tiles[commonanimationtilegid]
-
-			commonanimation = commonanimationtile.animation
-
-			for i = tileset.firstgid, lastgid do
-				local tile = map.tiles[i]
-				if not tile.animation then
-					tile.animation = {}
-					for _, frame in ipairs(commonanimation) do
-						local tileid = tile.id + (frame.tileid)
-
-						table.insert(tile.animation, {
-							tileid = tostring(tileid),
-							duration = frame.duration
-						})
-					end
-				end
-			end
-		end
-
-		local commoncollision = tileset.properties.commoncollision
-
-		if commoncollision then
-			local commoncollisiontilegid =
-				tileset.firstgid + commoncollision
-			local commoncollisiontile =
-				map.tiles[commoncollisiontilegid]
-
-			commoncollision = commoncollisiontile.objectGroup
-
-			for i = tileset.firstgid, lastgid do
-				local tile = map.tiles[i]
-				if not tile.objectGroup then
-					tile.objectGroup = commoncollision
-				end
-			end
-		end
-
-		if tileset.properties.font then
-			tileset.properties.font =
-				love.graphics.newImageFont(tileset.image,
-					tileset.properties.fontglyphs)
-		end
+		initTileset(tileset, map.tiles)
 	end
 
 	for l = #map.layers, 1, -1 do
@@ -339,6 +472,16 @@ local function newMap(mapfile)
 
 			layer = Layer(map, name, l)
 			for _, object in pairs(objects) do
+				local script = object.properties.script
+				if script then
+					require(script)
+				end
+
+				local textfont = object.properties.textfont
+				if textfont then
+					levity.fonts:load(textfont)
+				end
+
 				Object.setLayer(object, layer)
 			end
 
@@ -349,7 +492,23 @@ local function newMap(mapfile)
 		end
 	end
 
-	map.paused = false
+	initPhysics(map)
+
+	local intscale = math.min(math.floor(map.camera.scale), MaxIntScale)
+	map:resize(map.camera.w * intscale, map.camera.h * intscale)
+	map.canvas:setFilter("linear", "linear")
+
+	if map.properties.staticsounds then
+		levity.bank:load(map.properties.staticsounds, "static")
+	end
+	if map.properties.streamsounds then
+		levity.bank:load(map.properties.streamsounds, "stream")
+	end
+
+	if map.properties.overlaymap then
+		map.overlaymap = newMap(map.properties.overlaymap)
+		map.overlaymap.canvas = nil
+	end
 
 	return map
 end
