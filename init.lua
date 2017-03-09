@@ -3,6 +3,8 @@ love.filesystem.setRequirePath(
 	"levity/pl/lua/?/init.lua;"..
 	love.filesystem.getRequirePath())
 
+require("pl.strict").module("_G", _G)
+
 local audio = require "levity.audio"
 local text = require "levity.text"
 local stats = require "levity.stats"
@@ -71,12 +73,6 @@ function levity:update(dt)
 	collectgarbage("step", 1)
 
 	self.stats:update(dt)
-
-	if self.nextmapfile then
-		levity.map:broadcast("nextMap",
-			self.nextmapfile, self.nextmapdata)
-		self:loadNextMap()
-	end
 end
 
 function levity:draw()
@@ -256,6 +252,12 @@ end
 
 function love.update(dt)
 	levity:update(dt)
+
+	if levity.nextmapfile then
+		levity.map:broadcast("nextMap",
+			levity.nextmapfile, levity.nextmapdata)
+		levity:loadNextMap()
+	end
 end
 
 function love.draw()

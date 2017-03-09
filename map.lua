@@ -235,11 +235,11 @@ function Map.draw(map)
 end
 
 function Map.destroy(map)
-	map.scripts:unrequireAll()
-	map.world:destroy()
 	if map.overlaymap then
 		map.overlaymap:destroy()
 	end
+	map.world:destroy()
+	scripting.unloadScripts()
 	sti:flush()
 end
 
@@ -398,11 +398,21 @@ end
 
 function Map.initScripts(map)
 	map.scripts = scripting.newMachine()
+
+	scripting.beginScriptLoading()
 	for i = 1, #map.layers do
 		local layer = map.layers[i]
 
-		if layer.objects and layer.type == "dynamiclayer" then
-			if not map.properties.delayinitobjects then
+		if layer.objects then
+			for _, object in pairs(layer.objects) do
+				local script = object.properties.script
+				if script then
+					require(script)
+				end
+			end
+
+			if layer.type == "dynamiclayer"
+			and not map.properties.delayinitobjects then
 				for _, object in pairs(layer.objects) do
 					Object.init(object, layer)
 				end
@@ -413,6 +423,8 @@ function Map.initScripts(map)
 	end
 
 	map.scripts:newScript(map.name, map.properties.script, map)
+
+	scripting.endScriptLoading()
 
 	if map.overlaymap then
 		map.overlaymap:initScripts()
@@ -472,11 +484,6 @@ local function newMap(mapfile)
 
 			layer = Layer(map, name, l)
 			for _, object in pairs(objects) do
-				local script = object.properties.script
-				if script then
-					require(script)
-				end
-
 				local textfont = object.properties.textfont
 				if textfont then
 					levity.fonts:load(textfont)

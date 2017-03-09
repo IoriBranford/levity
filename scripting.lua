@@ -20,13 +20,6 @@ end)
 --	return scriptclass
 --end
 
---- Clean up all script classes
-function Machine:unrequireAll()
-	for name, _ in pairs(self.classes) do
-		package.loaded[name] = nil
-	end
-end
-
 --- Make a script start responding to a type of event
 -- @param script
 -- @param id of script
@@ -156,7 +149,34 @@ function Machine:clearLogs()
 end
 
 local scripting = {
-	newMachine = Machine
+	newMachine = Machine,
+	loaded = {}
 }
+
+local baseRequire = require
+
+local function scriptRequire(name)
+	if not package.loaded[name] then
+		scripting.loaded[name] = scripting.loaded[name]
+					or baseRequire(name)
+	end
+	return package.loaded[name]
+end
+
+function scripting.beginScriptLoading()
+	baseRequire = require
+	require = scriptRequire
+end
+
+function scripting.endScriptLoading()
+	require = baseRequire
+end
+
+function scripting.unloadScripts()
+	for n, _ in pairs(scripting.loaded) do
+		package.loaded[n] = nil
+		scripting.loaded[n] = nil
+	end
+end
 
 return scripting
