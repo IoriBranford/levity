@@ -195,7 +195,7 @@ function Map.update(map, dt)
 		map.scripts:broadcast("endMove", dt)
 
 		for _, layer in ipairs(map.layers) do
-			layer:update(dt)
+			layer:update(dt, map)
 		end
 		map.scripts:printLogs()
 	end
@@ -223,7 +223,7 @@ function Map.draw(map)
 	map.scripts:call(map.name, "beginDraw")
 	for _, layer in ipairs(map.layers) do
 		if layer.visible and layer.opacity > 0 then
-			map:drawLayer(layer)
+			layer:draw(map)
 		end
 	end
 	map.scripts:call(map.name, "endDraw")
@@ -238,6 +238,7 @@ function Map.destroy(map)
 	if map.overlaymap then
 		map.overlaymap:destroy()
 	end
+	map.world:setCallbacks()
 	map.world:destroy()
 	scripting.unloadScripts()
 	sti:flush()
@@ -355,39 +356,39 @@ local function initTileset(tileset, tiles)
 	end
 end
 
+function Map.collisionEvent(map, event, fixture, ...)
+	local ud = fixture:getBody():getUserData()
+	if ud then
+		local id = ud.id
+		if id then
+			map.scripts:call(id, event, fixture, ...)
+		end
+	end
+end
+
 local function initPhysics(map)
 	map.world = love.physics.newWorld(0, map.properties.gravity or 0)
 
-	local function collisionEvent(event, fixture, ...)
-		local ud = fixture:getBody():getUserData()
-		if ud then
-			local id = ud.id
-			if id then
-				map.scripts:call(id, event, fixture, ...)
-			end
-		end
-	end
-
 	local function beginContact(fixture1, fixture2, contact)
-		collisionEvent("beginContact", fixture1, fixture2, contact)
-		collisionEvent("beginContact", fixture2, fixture1, contact)
+		map:collisionEvent("beginContact", fixture1, fixture2, contact)
+		map:collisionEvent("beginContact", fixture2, fixture1, contact)
 	end
 
 	local function endContact(fixture1, fixture2, contact)
-		collisionEvent("endContact", fixture1, fixture2, contact)
-		collisionEvent("endContact", fixture2, fixture1, contact)
+		map:collisionEvent("endContact", fixture1, fixture2, contact)
+		map:collisionEvent("endContact", fixture2, fixture1, contact)
 	end
 
 	local function preSolve(fixture1, fixture2, contact)
-		collisionEvent("preSolve", fixture1, fixture2, contact)
-		collisionEvent("preSolve", fixture2, fixture1, contact)
+		map:collisionEvent("preSolve", fixture1, fixture2, contact)
+		map:collisionEvent("preSolve", fixture2, fixture1, contact)
 	end
 
 	local function postSolve(fixture1, fixture2, contact,
 				normal1, tangent1, normal2, tangent2)
-		collisionEvent("postSolve", fixture1, fixture2, contact,
+		map:collisionEvent("postSolve", fixture1, fixture2, contact,
 				normal1, tangent1, normal2, tangent2)
-		collisionEvent("postSolve", fixture2, fixture1, contact,
+		map:collisionEvent("postSolve", fixture2, fixture1, contact,
 				normal1, tangent1, normal2, tangent2)
 	end
 
@@ -414,7 +415,7 @@ function Map.initScripts(map)
 			if layer.type == "dynamiclayer"
 			and not map.properties.delayinitobjects then
 				for _, object in pairs(layer.objects) do
-					Object.init(object, layer)
+					Object.init(object, layer, map)
 				end
 			end
 		end
@@ -466,7 +467,6 @@ local function newMap(mapfile)
 
 	for l = #map.layers, 1, -1 do
 		local layer = map.layers[l]
-		layer.map = map
 		local layerdynamic = (layer.properties.static ~= true)
 
 		if layer.objects and layerdynamic then

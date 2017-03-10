@@ -14,10 +14,8 @@ local Tiles = require "levity.tiles"
 local Object = {}
 Object.__index = Object
 
-function Object.init(object, layer)
+function Object.init(object, layer, map)
 	object = setmetatable(object, Object)
-
-	local map = layer.map
 
 	if object.visible == nil then
 		object.visible = true
@@ -41,7 +39,7 @@ function Object.init(object, layer)
 
 	local shape = nil
 	if object.gid then
-		object:setGid(object.gid, true, bodytype)
+		object:setGid(object.gid, map, true, bodytype)
 	else
 		local angle = math.rad(object.rotation)
 		if object.shape == "rectangle" then
@@ -95,8 +93,60 @@ function Object.init(object, layer)
 	map.scripts:newScript(object.id, object.properties.script, object)
 end
 
-function Object.setGid(object, gid, animated, bodytype, applyfixtures)
-	local map = object.layer.map
+local function addFixture(object, shapeobj, map)
+	local bodyud = object.body:getUserData()
+
+	local tileset = map.tilesets[object.tile.tileset]
+	local tilewidth = tileset.tilewidth
+	local tileheight = tileset.tileheight
+
+	local shapecx = shapeobj.x + shapeobj.width*.5
+	local shapecy = -tileheight + shapeobj.y + shapeobj.height*.5
+
+	local flipx, flipy = Tiles.getGidFlip(object.gid)
+	if flipx then
+		local ox = object.tile.offset.x
+		shapecx = 2 * ox + tilewidth - shapecx
+	end
+	if flipy then
+		local oy = object.tile.offset.y
+		shapecy = 2 * oy + tileheight - shapecy
+	end
+
+	local shape
+	if shapeobj.shape == "rectangle" then
+		shape = love.physics.newRectangleShape(
+			shapecx, shapecy,
+			shapeobj.width, shapeobj.height)
+	elseif shapeobj.shape == "ellipse" then
+		shape = love.physics.newCircleShape(
+			shapecx, shapecy,
+			(shapeobj.width + shapeobj.height) * .25)
+	end
+
+	if shape then
+		local fixture = love.physics.newFixture(
+					object.body, shape)
+		fixture:setSensor(shapeobj.properties.sensor == true)
+		local fixtureud = {
+			--id = shapeobj.id,
+			--need Tiled issue fixed:
+			--github.com/bjorn/tiled/issues/1052
+			object = shapeobj,
+			properties = shapeobj.properties
+		}
+		fixture:setUserData(fixtureud)
+
+		if shapeobj.name ~= "" then
+			if not bodyud.fixtures then
+				bodyud.fixtures = {}
+			end
+			bodyud.fixtures[shapeobj.name] = fixture
+		end
+	end
+end
+
+function Object.setGid(object, gid, map, animated, bodytype, applyfixtures)
 	local newtile = map.tiles[Tiles.getUnflippedGid(gid)]
 	local newtileset = map.tilesets[newtile.tileset]
 	if applyfixtures == nil then
@@ -146,79 +196,26 @@ function Object.setGid(object, gid, animated, bodytype, applyfixtures)
 		})
 	end
 
-	local bodyud = object.body:getUserData()
-
-	local tileset = map.tilesets[object.tile.tileset]
-	local tilewidth = tileset.tilewidth
-	local tileheight = tileset.tileheight
-
-	local function addFixture(shapeobj)
-		local shapecx = shapeobj.x + shapeobj.width*.5
-		local shapecy = -tileheight + shapeobj.y + shapeobj.height*.5
-
-		local flipx, flipy = Tiles.getGidFlip(gid)
-		if flipx then
-			local ox = object.tile.offset.x
-			shapecx = 2 * ox + tilewidth - shapecx
-		end
-		if flipy then
-			local oy = object.tile.offset.y
-			shapecy = 2 * oy + tileheight - shapecy
-		end
-
-		local shape
-		if shapeobj.shape == "rectangle" then
-			shape = love.physics.newRectangleShape(
-				shapecx, shapecy,
-				shapeobj.width, shapeobj.height)
-		elseif shapeobj.shape == "ellipse" then
-			shape = love.physics.newCircleShape(
-				shapecx, shapecy,
-				(shapeobj.width + shapeobj.height) * .25)
-		end
-
-		if shape then
-			local fixture = love.physics.newFixture(
-						object.body, shape)
-			fixture:setSensor(shapeobj.properties.sensor == true)
-			local fixtureud = {
-				--id = shapeobj.id,
-				--need Tiled issue fixed:
-				--github.com/bjorn/tiled/issues/1052
-				object = shapeobj,
-				properties = shapeobj.properties
-			}
-			fixture:setUserData(fixtureud)
-
-			if shapeobj.name ~= "" then
-				if not bodyud.fixtures then
-					bodyud.fixtures = {}
-				end
-				bodyud.fixtures[shapeobj.name] = fixture
-			end
-		end
-	end
-
 	local objectgroup = object.tile.objectGroup
 	if applyfixtures and objectgroup then
 		for i, shapeobj in ipairs(objectgroup.objects) do
 			if shapeobj.properties.collidable == true then
-				addFixture(shapeobj)
+				addFixture(object, shapeobj, map)
 			end
 		end
 	end
 end
 
-function Object.setLayer(object, layer)
-	local function removeObject(objects)
-		for i, o in pairs(objects) do
-			if o == object then
-				table.remove(objects, i)
-				return
-			end
+local function removeObject(objects, object)
+	for i, o in pairs(objects) do
+		if o == object then
+			table.remove(objects, i)
+			return
 		end
 	end
+end
 
+function Object.setLayer(object, layer)
 	local oldlayer = object.layer
 	if oldlayer == layer then
 		return
