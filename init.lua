@@ -32,7 +32,7 @@ local levity = {}
 
 function levity:setNextMap(nextmapfile, nextmapdata)
 	self.nextmapfile = nextmapfile
-	self.nextmapdata = nextmapdata or {}
+	self.nextmapdata = nextmapdata
 end
 
 function levity:loadNextMap()
