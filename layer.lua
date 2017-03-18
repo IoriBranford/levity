@@ -178,21 +178,12 @@ local function dynamicObject_draw(object, layer, map)
 end
 
 function Layer.draw(layer, map)
-	levity = levity or require "levity" --TEMP
-
-	local r,g,b,a = love.graphics.getColor()
-	love.graphics.setColor(r, g, b, a * layer.opacity)
-
-	map.scripts:call(layer.name, "beginDraw")
 	love.graphics.push()
 	love.graphics.translate(layer.offsetx, layer.offsety)
 	for _, object in ipairs(layer.spriteobjects) do
 		dynamicObject_draw(object, layer, map)
 	end
 	love.graphics.pop()
-	map.scripts:call(layer.name, "endDraw")
-
-	love.graphics.setColor(r,g,b,a)
 end
 
 local function newLayer(map, name, i)

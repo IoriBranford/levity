@@ -223,7 +223,12 @@ function Map.draw(map)
 	map.scripts:call(map.name, "beginDraw")
 	for _, layer in ipairs(map.layers) do
 		if layer.visible and layer.opacity > 0 then
+			map.scripts:call(layer.name, "beginDraw")
+			local r,g,b,a = love.graphics.getColor()
+			love.graphics.setColor(r, g, b, a * layer.opacity)
 			layer:draw(map)
+			love.graphics.setColor(r,g,b,a)
+			map.scripts:call(layer.name, "endDraw")
 		end
 	end
 	map.scripts:call(map.name, "endDraw")
