@@ -6,7 +6,7 @@ local Layer = require "levity.layer"
 local Object = require "levity.object"
 local Tiles = require "levity.tiles"
 
-local MaxIntScale = 4
+local CanvasMaxScale = 4
 
 --- @table Map
 -- @field objecttypes
@@ -16,7 +16,8 @@ local MaxIntScale = 4
 -- @field discardedobjects
 -- @field paused
 
-local Map = {}
+local Map = {
+}
 -- Still want STI Map functions, so do not use class or metatable.
 
 function Map.getTileGid(map, tilesetid, row, column)
@@ -207,13 +208,20 @@ function Map.update(map, dt)
 	end
 end
 
+local VisibleFixtures = {}
+
 function Map.draw(map)
+	if map.canvas then
+		love.graphics.setCanvas(map.canvas)
+		love.graphics.clear(0, 0, 0, 1, map.canvas)
+	end
+
 	local cx, cy = map.camera.x, map.camera.y
 	local cw, ch = map.camera.w, map.camera.h
 	local ccx, ccy = cx+cw*.5, cy+ch*.5
 
 	local scale = map.camera.scale
-	local intscale = math.min(math.floor(scale), MaxIntScale)
+	local intscale = math.min(math.floor(scale), CanvasMaxScale)
 
 	love.graphics.push()
 	love.graphics.translate(-(cx * intscale),
@@ -232,10 +240,61 @@ function Map.draw(map)
 		end
 	end
 	map.scripts:call(map.name, "endDraw")
+
+	if levity.drawbodies then
+		map.world:queryBoundingBox(cx, cy, cx+cw, cy+ch,
+			function(fixture)
+				VisibleFixtures[#VisibleFixtures+1] = fixture
+				return true
+			end)
+
+		for _, fixture in ipairs(VisibleFixtures) do
+			local body = fixture:getBody()
+			love.graphics.circle("line", body:getX(), body:getY(),
+						intscale)
+
+			local bodycx, bodycy = body:getWorldCenter()
+			love.graphics.line(bodycx - intscale, bodycy,
+					bodycx + intscale, bodycy)
+			love.graphics.line(bodycx, bodycy - intscale,
+					bodycx, bodycy + intscale)
+
+			local shape = fixture:getShape()
+			if shape:getType() == "circle" then
+				local x, y = body:getWorldPoint(
+					shape:getPoint())
+				love.graphics.circle("line", x, y,
+					shape:getRadius())
+				love.graphics.points(x, y)
+			elseif shape:getType() == "polygon" then
+				love.graphics.polygon("line",
+					body:getWorldPoints(shape:getPoints()))
+			elseif shape:getType() == "chain" then
+				love.graphics.line(
+					body:getWorldPoints(shape:getPoints()))
+			end
+		end
+
+		while #VisibleFixtures > 0 do
+			VisibleFixtures[#VisibleFixtures] = nil
+		end
+	end
+
 	love.graphics.pop()
 
 	if map.overlaymap then
 		map.overlaymap:draw()
+	end
+
+	if map.canvas then
+		love.graphics.setCanvas()
+		local canvasscale = scale / intscale
+		love.graphics.draw(map.canvas,
+					love.graphics.getWidth()*.5,
+					love.graphics.getHeight()*.5,
+					0, canvasscale, canvasscale,
+					map.canvas:getWidth()*.5,
+					map.canvas:getHeight()*.5)
 	end
 end
 
@@ -437,6 +496,16 @@ function Map.initScripts(map)
 	end
 end
 
+function Map.windowResized(map, w, h)
+	local camera = map.camera
+	local scale = math.min(w/camera.w, h/camera.h)
+	local intscale = math.min(math.floor(scale), CanvasMaxScale)
+	if intscale ~= math.floor(camera.scale) then
+		map:resize(camera.w * intscale, camera.h * intscale)
+	end
+	camera.scale = scale
+end
+
 local function newMap(mapfile)
 	levity = require "levity"
 
@@ -505,10 +574,6 @@ local function newMap(mapfile)
 	end
 
 	initPhysics(map)
-
-	local intscale = math.min(math.floor(map.camera.scale), MaxIntScale)
-	map:resize(map.camera.w * intscale, map.camera.h * intscale)
-	map.canvas:setFilter("linear", "linear")
 
 	if map.properties.staticsounds then
 		levity.bank:load(map.properties.staticsounds, "static")

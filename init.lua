@@ -15,8 +15,6 @@ require "levity.xcoroutine"
 require "levity.xmath"
 require "levity.class"
 
-local MaxIntScale = 4
-
 --- @table levity
 -- @field map
 -- @field bank
@@ -53,6 +51,10 @@ function levity:loadNextMap()
 	self.map = Map(self.mapfile)
 	self.map:initScripts()
 
+	self.map:windowResized(love.graphics.getWidth(),
+				love.graphics.getHeight())
+	-- After initScripts because script is where camera size is set.
+
 	self.maxdt = 1/16
 	self.timescale = 1
 	collectgarbage()
@@ -81,59 +83,7 @@ function levity:draw()
 		return
 	end
 
-	local canvas = self.map.canvas
-	love.graphics.setCanvas(canvas)
-	love.graphics.clear(0, 0, 0, 1, canvas)
 	self.map:draw()
-
-	love.graphics.setCanvas()
-	local scale = self.map.camera.scale
-	local intscale = math.min(math.floor(scale), MaxIntScale)
-	local canvasscale = scale / intscale
-	love.graphics.draw(canvas,
-				love.graphics.getWidth()*.5,
-				love.graphics.getHeight()*.5,
-				0, canvasscale, canvasscale,
-				canvas:getWidth()*.5,
-				canvas:getHeight()*.5)
-
-	if self.drawbodies then
-		local cx, cy = self.map.camera.x, self.map.camera.y
-		local cw, ch = self.map.camera.w, self.map.camera.h
-		love.graphics.push()
-		love.graphics.scale(scale, scale)
-		love.graphics.translate(-cx, -cy)
-		local fixtures = {}
-		self.map.world:queryBoundingBox(cx, cy, cx+cw, cy+ch,
-		function(fixture)
-			table.insert(fixtures, fixture)
-			return true
-		end)
-
-		for _, fixture in ipairs(fixtures) do
-			local body = fixture:getBody()
-			love.graphics.circle("line", body:getX(), body:getY(), 2)
-			local bodycx, bodycy = body:getWorldCenter()
-			love.graphics.line(bodycx - 2, bodycy, bodycx + 2, bodycy)
-			love.graphics.line(bodycx, bodycy - 2, bodycx, bodycy + 2)
-
-			local shape = fixture:getShape()
-			if shape:getType() == "circle" then
-				local x, y = body:getWorldPoint(
-					shape:getPoint())
-				love.graphics.circle("line", x, y,
-					shape:getRadius())
-				love.graphics.points(x, y)
-			elseif shape:getType() == "polygon" then
-				love.graphics.polygon("line",
-					body:getWorldPoints(shape:getPoints()))
-			elseif shape:getType() == "chain" then
-				love.graphics.line(
-					body:getWorldPoints(shape:getPoints()))
-			end
-		end
-		love.graphics.pop()
-	end
 
 	self.stats:draw()
 end
@@ -241,13 +191,7 @@ function love.wheelmoved(x, y)
 end
 
 function love.resize(w, h)
-	local camera = levity.map.camera
-	local scale = math.min(w/camera.w, h/camera.h)
-	local intscale = math.min(math.floor(scale), MaxIntScale)
-	if intscale ~= math.floor(camera.scale) then
-		levity.map:resize(camera.w * intscale, camera.h * intscale)
-	end
-	camera.scale = scale
+	levity.map:windowResized(w, h)
 end
 
 function love.update(dt)
