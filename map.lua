@@ -500,9 +500,8 @@ function Map.windowResized(map, w, h)
 	local camera = map.camera
 	local scale = math.min(w/camera.w, h/camera.h)
 	local intscale = math.min(math.floor(scale), CanvasMaxScale)
-	if intscale ~= math.floor(camera.scale) then
-		map:resize(camera.w * intscale, camera.h * intscale)
-	end
+	map:resize(camera.w * intscale, camera.h * intscale)
+	map.canvas:setFilter("linear", "linear")
 	camera.scale = scale
 end
 
