@@ -22,10 +22,12 @@ require "levity.class"
 -- @field stats
 -- @field timescale
 -- @field maxdt
+-- @field updatewait Time left until next game update
 -- @field drawbodies
 -- @field nextmapfile Will load and switch to this map on the next frame
 -- @field nextmapdata
 
+local UpdateWait = 1/60
 local levity = {}
 
 function levity:setNextMap(nextmapfile, nextmapdata)
@@ -57,24 +59,30 @@ function levity:loadNextMap()
 
 	self.maxdt = 1/16
 	self.timescale = 1
+	self.updatewait = 0
 	collectgarbage()
 end
 
 function levity:update(dt)
 	dt = math.min(dt, self.maxdt)
-	dt = dt*self.timescale
+	--dt = dt*self.timescale
 
-	self.map:update(dt)
+	while self.updatewait <= 0 do
+		self.map:update(UpdateWait*self.timescale)
 
-	if self.map.paused then
-		self.bank:update(0)
-	else
-		self.bank:update(dt)
+		if self.map.paused then
+			self.bank:update(0)
+		else
+			self.bank:update(UpdateWait*self.timescale)
+		end
+		self.updatewait = self.updatewait + UpdateWait
 	end
 
 	collectgarbage("step", 1)
 
 	self.stats:update(dt)
+
+	self.updatewait = self.updatewait - dt
 end
 
 function levity:draw()

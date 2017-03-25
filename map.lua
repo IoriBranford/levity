@@ -224,8 +224,8 @@ function Map.draw(map)
 	local intscale = math.min(math.floor(scale), CanvasMaxScale)
 
 	love.graphics.push()
-	love.graphics.translate(-(cx * intscale),
-				-(cy * intscale))
+	love.graphics.translate(-math.floor(cx * intscale),
+				-math.floor(cy * intscale))
 	love.graphics.scale(intscale, intscale)
 
 	map.scripts:call(map.name, "beginDraw")
@@ -320,8 +320,8 @@ local function camera_set(camera, cx, cy, w, h)
 		local gh = love.graphics.getHeight()
 		camera.scale = math.min(gw/camera.w, gh/camera.h)
 	end
-	camera.x = math.floor(cx - camera.w * .5)
-	camera.y = math.floor(cy - camera.h * .5)
+	camera.x = (cx - camera.w * .5)
+	camera.y = (cy - camera.h * .5)
 end
 
 local function camera_zoom(camera, vz)
