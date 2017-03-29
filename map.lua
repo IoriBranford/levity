@@ -528,6 +528,15 @@ local function newMap(mapfile)
 	if map.objecttypes then
 		maputil.setObjectsDefaultProperties(map.objects,
 							map.objecttypes)
+		local tiles = map.tiles
+		for i = 1, #tiles do
+			local tile = tiles[i]
+			local objectgroup = tile.objectGroup
+			if objectgroup then
+				maputil.setObjectsDefaultProperties(
+					objectgroup.objects, map.objecttypes)
+			end
+		end
 	end
 
 	local width = map.width * map.tilewidth
