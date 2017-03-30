@@ -105,24 +105,40 @@ end
 local NoFirstMapMessage =
 "First map not set. In main.lua call levity:setNextMap to set the first map"
 
+local Usage = {
+	Desc =	"Levity 2D game engine\n",
+	Game =	"  <game> (string)			Game location\n",
+	Debug =	"  -debug				Debugging in Zerobrane Studio\n",
+	Map =	"  <map>	 (string default %s)	Map file to start\n"
+}
+
 function love.load()
-	for a, ar in ipairs(arg) do
-		if ar == "-debug" then
-			require("mobdebug").start()
-			require("mobdebug").off()
-		else
-			local c1, c2 = ar:find("-map=")
-			if c1 == 1 then
-				local mapfile = ar:sub(c2+1)
-				levity:setNextMap(mapfile)
-			end
-		end
+	local lapp = require "pl.lapp"
+	lapp.slack = true
+
+	assert(levity.nextmapfile, NoFirstMapMessage)
+
+	local options = Usage.Desc
+	if not love.filesystem.isFused() then
+		options = options .. Usage.Game
+	end
+	options = options .. Usage.Debug
+	options = options .. string.format(Usage.Map, levity.nextmapfile)
+
+	local args = lapp (options)
+
+	if args.debug then
+		require("mobdebug").start()
+		require("mobdebug").off()
+	end
+
+	if args.map then
+		levity:setNextMap(args.map)
 	end
 
 	love.graphics.setNewFont(18)
 	love.physics.setMeter(64)
 
-	assert(levity.nextmapfile, NoFirstMapMessage)
 	love.joystick.loadGamepadMappings("levity/gamecontrollerdb.txt")
 	levity:loadNextMap()
 end
