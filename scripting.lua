@@ -34,6 +34,9 @@ function Machine:scriptAddEventFunc(script, id, event, func)
 	script[event] = func
 end
 
+local function Pass()
+end
+
 --- Make a script stop responding to a type of event
 -- @param script
 -- @param id of script
@@ -44,7 +47,10 @@ function Machine:scriptRemoveEventFunc(script, id, event)
 	end
 
 	self.eventscripts[event][id] = nil
-	script[event] = nil
+	script[event] = nil		-- clear func in script table
+	if script[event] ~= nil then	-- still has func in class metatable
+		script[event] = Pass
+	end
 end
 
 --- Start a new instance of a script
