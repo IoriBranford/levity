@@ -553,6 +553,7 @@ local function newMap(mapfile)
 
 		if layer.objects and layerdynamic then
 			local name = layer.name
+			local visible = layer.visible
 			local objects = layer.objects
 			local offsetx = layer.offsetx
 			local offsety = layer.offsety
@@ -574,6 +575,7 @@ local function newMap(mapfile)
 				Object.setLayer(object, layer)
 			end
 
+			layer.visible = visible
 			layer.offsetx = offsetx
 			layer.offsety = offsety
 			layer.properties = properties
