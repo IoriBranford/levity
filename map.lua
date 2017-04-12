@@ -162,6 +162,10 @@ function Map.cleanupObjects(map)
 		Object.setLayer(object, nil)
 
 		if object.body then
+			for _, fixture in pairs(object.body:getFixtureList()) do
+				fixture:setUserData(nil)
+			end
+			object.body:setUserData(nil)
 			object.body:destroy()
 		end
 
@@ -302,6 +306,8 @@ function Map.destroy(map)
 	if map.overlaymap then
 		map.overlaymap:destroy()
 	end
+	map.discardedobjects = map.objects
+	map:cleanupObjects()
 	map.world:setCallbacks()
 	map.world:destroy()
 	scripting.unloadScripts()
