@@ -3,7 +3,7 @@ local Fonts = class(function(self)
 end)
 
 function Fonts:load(fontfiles)
-	function load(fontfile)
+	local function load(fontfile)
 		local font = self.fonts[fontfile]
 		if not font then
 			if love.filesystem.exists(fontfile) then
