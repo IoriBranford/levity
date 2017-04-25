@@ -51,10 +51,6 @@ local LayerAddedTooManyObjectsMessage =
 [[Tried to add too many (]]..LayerMaxNewObjects..[[) objects at a time to one
 layer. Avoid recursive object creation in object init functions.]]
 
-local function objectIsAbove(object1, object2)
-	return object1.y < object2.y
-end
-
 function Layer.update(layer, dt, map)
 	local numnewobj = #layer.newobjects
 	for i = 1, numnewobj do
@@ -82,7 +78,7 @@ function Layer.update(layer, dt, map)
 	end
 
 	if layer.draworder == "topdown" then
-		table.sort(layer.spriteobjects, objectIsAbove)
+		table.sort(layer.spriteobjects)
 	end
 end
 

@@ -13,6 +13,10 @@ local Tiles = require "levity.tiles"
 
 local Object = {}
 Object.__index = Object
+function Object.__lt(object1, object2)
+	local dy = object1.y - object2.y
+	return dy < 0 or (dy == 0 and object1.id < object2.id)
+end
 
 function Object.init(object, layer, map)
 	object = setmetatable(object, Object)
