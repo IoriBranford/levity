@@ -308,7 +308,13 @@ function Map.destroy(map)
 	end
 	map.discardedobjects = map.objects
 	map:cleanupObjects()
-	map.world:setCallbacks()
+	for _, body in pairs(map.world:getBodyList()) do
+		for _, fixture in pairs(body:getFixtureList()) do
+			fixture:setUserData(nil)
+		end
+		body:setUserData(nil)
+	end
+	map.world:setCallbacks(nil, nil, nil, nil)
 	map.world:destroy()
 	scripting.unloadScripts()
 	sti:flush()
