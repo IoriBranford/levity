@@ -78,7 +78,7 @@ function Layer.update(layer, dt, map)
 	end
 
 	if layer.draworder == "topdown" then
-		table.sort(layer.spriteobjects)
+		table.sort(layer.spriteobjects, Object.__lt)
 	end
 end
 
