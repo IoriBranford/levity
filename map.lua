@@ -111,6 +111,46 @@ function Map.tileNamesToGids(map, names)
 	return gids
 end
 
+function Map.newParticleSystem(map, gid, buffersize)
+	buffersize = buffersize or 256
+	gid = Tiles.getUnflippedGid(gid)
+	local tile = map.tiles[gid]
+	local tilesetid = tile.tileset
+	local tileset = map.tilesets[tilesetid]
+	local image = tileset.image
+
+	local particles = love.graphics.newParticleSystem(image, buffersize)
+
+	particles:setParticleLifetime(1)
+	particles:setEmissionRate(0)
+	particles:setSpread(2*math.pi)
+	particles:setSpeed(60)
+	map:setParticlesGid(particles, gid)
+	return particles
+end
+
+function Map.setParticlesGid(map, particles, gid)
+	gid = Tiles.getUnflippedGid(gid)
+	local tile = map.tiles[gid]
+	local tilesetid = tile.tileset
+	local tileset = map.tilesets[tilesetid]
+	particles:setTexture(tileset.image)
+
+	local animation = tile.animation
+	if animation then
+		local quads = {}
+		for i = 1, #animation do
+			local frame = animation[i]
+			local frametile = map.tiles[tileset.firstgid
+							+ frame.tileid]
+			quads[#quads+1] = frametile.quad
+		end
+		particles:setQuads(unpack(quads))
+	else
+		particles:setQuads(tile.quad)
+	end
+end
+
 function Map.updateTilesetAnimations(map, tileset, dt)
 	if type(tileset) ~= "table" then
 		tileset = map.tilesets[tileset]
