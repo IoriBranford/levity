@@ -209,7 +209,7 @@ function Map.cleanupObjects(map)
 			object.body:destroy()
 		end
 
-		map.scripts:destroyScript(id)
+		map.scripts:destroyIdScripts(id)
 
 		map.objects[id] = nil
 	end

@@ -4,6 +4,7 @@ require "levity.class"
 
 local Machine = class(function(self)
 	self.eventscripts = {}
+	self.idscripts = {}
 	self.logs = {}
 	self.classes = {}
 end)
@@ -30,7 +31,7 @@ function Machine:scriptAddEventFunc(script, id, event, func)
 		self.eventscripts[event] = {}
 	end
 
-	self.eventscripts[event][id] = script
+	self.eventscripts[event][script] = script
 	script[event] = func
 end
 
@@ -46,7 +47,7 @@ function Machine:scriptRemoveEventFunc(script, id, event)
 		return
 	end
 
-	self.eventscripts[event][id] = nil
+	self.eventscripts[event][script] = nil
 	script[event] = nil		-- clear func in script table
 	if script[event] ~= nil then	-- still has func in class metatable
 		script[event] = Pass
@@ -65,12 +66,17 @@ function Machine:newScript(id, name, object, ...)
 		self.classes[name] = scriptclass
 		script = scriptclass(object, ...)
 
+		if not self.idscripts[id] then
+			self.idscripts[id] = {}
+		end
+		self.idscripts[id][script] = script
+
 		for event, func in pairs(scriptclass) do
 			if type(func) == "function" then
 				if not self.eventscripts[event] then
 					self.eventscripts[event] = {}
 				end
-				self.eventscripts[event][id] = script
+				self.eventscripts[event][script] = script
 			end
 		end
 	end
@@ -79,11 +85,35 @@ end
 
 --- Destroy a script instance
 -- @param id The key for identifying the instance
-function Machine:destroyScript(id)
-	for event, scripts in pairs(self.eventscripts) do
-		scripts[id] = nil
+function Machine:destroyIdScripts(id)
+	local idscripts = self.idscripts[id]
+	if not idscripts then
+		return
 	end
-	self.logs[id] = nil
+
+	for _, script in pairs(idscripts) do
+		for _, eventscripts in pairs(self.eventscripts) do
+			eventscripts[script] = nil
+		end
+		self.logs[script] = nil
+	end
+	self.idscripts[id] = nil
+end
+
+function Machine:destroyScript(script, id)
+	if id then
+		local idscripts = self.idscripts[id]
+		if idscripts then
+			idscripts[script] = nil
+		end
+	else
+		for _, idscripts in pairs(self.idscripts) do
+			idscripts[script] = nil
+		end
+	end
+	for event, scripts in pairs(self.eventscripts) do
+		scripts[script] = nil
+	end
 end
 
 --- Send event to one script
@@ -92,19 +122,20 @@ end
 -- @param ... Additional params
 -- @return Whatever the script returns
 function Machine:call(id, event, ...)
-	local scripts = self.eventscripts[event]
-	if not scripts then
+	local idscripts = self.idscripts[id]
+	if not idscripts then
 		return
 	end
 
-	local script = scripts[id]
-	if script then
-		--assert(script[event], "No function "..event.." in script "..id)
-		local log = self.logs[id]
+	for _, script in pairs(idscripts) do
+		local log = self.logs[script]
 		if log then
-			log[#log + 1] = { event, ... }
+			log[#log + 1] = { id, event, ... }
 		end
-		return script[event](script, ...)
+		local func = script[event]
+		if func then
+			return func(script, ...)
+		end
 	end
 end
 
@@ -117,9 +148,8 @@ function Machine:broadcast(event, ...)
 		return
 	end
 
-	for id, script in pairs(scripts) do
-		--assert(script[event], "No function "..event.." in script "..id)
-		local log = self.logs[id]
+	for _, script in pairs(scripts) do
+		local log = self.logs[script]
 		if log then
 			log[#log + 1] = { event, ... }
 		end
@@ -129,13 +159,13 @@ end
 
 --- Start logging events for a script
 -- @param id of script
-function Machine:startLog(id)
-	self.logs[id] = {}
+function Machine:startLog(script)
+	self.logs[script] = {}
 end
 
 --- Print all events logged so far
 function Machine:printLogs()
-	for id, log in pairs(self.logs) do
+	for script, log in pairs(self.logs) do
 		for i = 1, #log, 1 do
 			print(unpack(log[i]))
 		end
@@ -147,7 +177,7 @@ end
 
 --- Delete all events logged so far
 function Machine:clearLogs()
-	for id, log in pairs(self.logs) do
+	for script, log in pairs(self.logs) do
 		for i = #log, 1, -1 do
 			log[i] = nil
 		end
