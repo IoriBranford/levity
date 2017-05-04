@@ -116,11 +116,6 @@ function Machine:destroyScript(script, id)
 	end
 end
 
---- Send event to one script
--- @param id of script
--- @param event Type of event
--- @param ... Additional params
--- @return Whatever the script returns
 function Machine:call(id, event, ...)
 	local idscripts = self.idscripts[id]
 	if not idscripts then
@@ -135,6 +130,28 @@ function Machine:call(id, event, ...)
 		local func = script[event]
 		if func then
 			return func(script, ...)
+		end
+	end
+end
+
+--- Send event to one id's scripts
+-- @param id of script
+-- @param event Type of event
+-- @param ... Additional params
+function Machine:send(id, event, ...)
+	local idscripts = self.idscripts[id]
+	if not idscripts then
+		return
+	end
+
+	for _, script in pairs(idscripts) do
+		local log = self.logs[script]
+		if log then
+			log[#log + 1] = { id, event, ... }
+		end
+		local func = script[event]
+		if func then
+			func(script, ...)
 		end
 	end
 end

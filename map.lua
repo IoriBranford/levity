@@ -272,18 +272,18 @@ function Map.draw(map)
 				-math.floor(cy * intscale))
 	love.graphics.scale(intscale, intscale)
 
-	map.scripts:call(map.name, "beginDraw")
+	map.scripts:send(map.name, "beginDraw")
 	for _, layer in ipairs(map.layers) do
 		if layer.visible and layer.opacity > 0 then
-			map.scripts:call(layer.name, "beginDraw")
+			map.scripts:send(layer.name, "beginDraw")
 			local r,g,b,a = love.graphics.getColor()
 			love.graphics.setColor(r, g, b, a * layer.opacity)
 			layer:draw(map)
 			love.graphics.setColor(r,g,b,a)
-			map.scripts:call(layer.name, "endDraw")
+			map.scripts:send(layer.name, "endDraw")
 		end
 	end
-	map.scripts:call(map.name, "endDraw")
+	map.scripts:send(map.name, "endDraw")
 
 	if levity.drawbodies then
 		map.world:queryBoundingBox(cx, cy, cx+cw, cy+ch,
@@ -477,7 +477,7 @@ function Map.collisionEvent(map, event, fixture, ...)
 	if ud then
 		local id = ud.id
 		if id then
-			map.scripts:call(id, event, fixture, ...)
+			map.scripts:send(id, event, fixture, ...)
 		end
 	end
 end

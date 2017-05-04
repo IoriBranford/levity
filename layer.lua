@@ -38,7 +38,7 @@ local function dynamicObject_updateAnimation(object, dt, map)
 	end
 
 	if looped then
-		map.scripts:call(object.id, "loopedAnimation")
+		map.scripts:send(object.id, "loopedAnimation")
 	end
 end
 
@@ -101,7 +101,7 @@ local function dynamicObject_draw(object, layer, map)
 		return
 	end
 
-	scripts:call(object.id, "beginDraw")
+	scripts:send(object.id, "beginDraw")
 
 	local left = object.x
 	local top = object.y
@@ -170,7 +170,7 @@ local function dynamicObject_draw(object, layer, map)
 					textalign)--, object.rotation)
 	end
 
-	scripts:call(object.id, "endDraw")
+	scripts:send(object.id, "endDraw")
 end
 
 function Layer.draw(layer, map)
