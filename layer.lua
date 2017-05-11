@@ -47,20 +47,26 @@ function Layer.addObject(layer, object)
 end
 
 local LayerMaxNewObjects = 256
-local LayerAddedTooManyObjectsMessage = 
+local LayerAddedTooManyObjectsMessage =
 [[Tried to add too many (]]..LayerMaxNewObjects..[[) objects at a time to one
 layer. Avoid recursive object creation in object init functions.]]
 
 function Layer.update(layer, dt, map)
-	local numnewobj = #layer.newobjects
-	for i = 1, numnewobj do
-		Object.init(layer.newobjects[i], layer, map)
-		numnewobj = #layer.newobjects
-		assert(numnewobj <= LayerMaxNewObjects,
-			LayerAddedTooManyObjectsMessage)
+	local i0 = 1
+	local i1 = #layer.newobjects
+
+	while i0 <= i1 do
+		for i = i0, i1 do
+			Object.init(layer.newobjects[i], layer, map)
+		end
+
+		i0 = i1 + 1
+		i1 = #layer.newobjects
+
+		assert(i1 <= LayerMaxNewObjects, LayerAddedTooManyObjectsMessage)
 	end
 
-	for i = 1, #layer.newobjects do
+	for i = #layer.newobjects, 1, -1 do
 		layer.newobjects[i] = nil
 	end
 
