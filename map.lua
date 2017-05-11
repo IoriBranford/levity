@@ -111,6 +111,32 @@ function Map.tileNamesToGids(map, names)
 	return gids
 end
 
+function Map.newSpriteBatch(map, tileset, size, usage)
+	size = size or 32
+	usage = usage or "dynamic"
+	local tileset = map.tilesets[tileset]
+	local image = tileset.image
+
+	local spritebatch = love.graphics.newSpriteBatch(image, size, usage)
+	return spritebatch
+end
+
+function Map.addBatchSprite(map, batch, gid, x, y, r, sx, sy, ox, oy, kx, ky)
+	local tile = map.tiles[gid]
+	local quad = tile.quad
+	return batch:add(quad, x, y, r, sx, sy, ox, oy, kx, ky)
+end
+
+function Map.setBatchSprite(map, batch, i, gid, x, y, r, sx, sy, ox, oy, kx, ky)
+	if not gid or gid <= 0 then
+		batch:set(i, 0, 0, 0, 0, 0)
+	else
+		local tile = map.tiles[gid]
+		local quad = tile.quad
+		batch:set(i, quad, x, y, r, sx, sy, ox, oy, kx, ky)
+	end
+end
+
 function Map.newParticleSystem(map, gid, buffersize)
 	buffersize = buffersize or 256
 	gid = Tiles.getUnflippedGid(gid)
