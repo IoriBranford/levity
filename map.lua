@@ -583,6 +583,97 @@ function Map.windowResized(map, w, h)
 	camera.scale = scale
 end
 
+local function incIdProperties(properties, incid)
+	for pn, pv in pairs(properties) do
+		if type(pv) == "number" and pn:sub(-2) == "id" then
+			properties[pn] = pv + incid
+		end
+	end
+end
+
+local function mergeMaps(map1, map2)
+	local utils = require "sti.sti.utils"
+
+	--Bump gids
+	local lasttileset1 = map1.tilesets[#map1.tilesets]
+	local incgid = lasttileset1.firstgid + lasttileset1.tilecount - 1
+
+	--Bump object ids
+	local incid = map1.nextobjectid - 1
+
+	--Next object id
+	map1.nextobjectid = incid + map2.nextobjectid
+
+	local tilesets1 = {}
+	local tilesets2 = map2.tilesets
+	for i = 1, #map1.tilesets do
+		local tileset1 = map1.tilesets[i]
+		tilesets1[tileset1.name] = tileset1
+	end
+	for i = 1, #tilesets2 do
+		local tileset2 = tilesets2[i]
+		if not tilesets1[tileset2.name] then
+			--Tileset firstgids
+			tileset2.firstgid = tileset2.firstgid + incgid
+			map1.tilesets[#map1.tilesets + 1] = tileset2
+		end
+	end
+
+	local layers1 = map1.layers
+	local layers2 = map2.layers
+	for i = 1, #layers2 do
+		local layer2 = layers2[i]
+
+		--Object id references in properties
+		incIdProperties(layer2.properties, incid)
+
+		if layer2.objects then
+			for _, object2 in pairs(layer2.objects) do
+				--Tile object gids
+				if object2.gid then
+					object2.gid = object2.gid + incgid
+				end
+
+				--Object ids
+				object2.id = object2.id + incid
+
+				--Object id references in properties
+				incIdProperties(object2.properties, incid)
+			end
+		end
+
+		--Tile layer gids
+		local data = layer2.data
+
+		if layer2.encoding == "base64" then
+			require "ffi"
+
+			local fd  = love.filesystem.newFileData(data, "data",
+							"base64"):getString()
+
+			local compression = layer2.compression
+			if compression == "zlib" or compression == "gzip" then
+				fd = love.math.decompress(fd, compression)
+			end
+
+			data = utils.get_decompressed_data(fd)
+
+			layer2.data = data
+			layer2.encoding = nil
+		end
+
+		if data then
+			for i = 1, #data do
+				data[i] = data[i] + incgid
+			end
+		end
+
+		layers1[#layers1 + 1] = layer2
+	end
+
+	return map1
+end
+
 local function newMap(mapfile)
 	levity = require "levity"
 
