@@ -22,7 +22,7 @@ require "levity.class"
 -- @field camera
 -- @field scripts
 -- @field world
--- @field discardedobjectids
+-- @field discardedobjects
 -- @field bank
 -- @field fonts
 -- @field stats
@@ -136,7 +136,7 @@ function levity:loadNextMap()
 	self.fonts = text.newFonts()
 	self.stats = stats.newStats()
 	self.map = nil
-	self.discardedobjectids = {}
+	self.discardedobjects = {}
 	self.camera = {
 		x = 0, y = 0,
 		w = love.graphics.getWidth(), h = love.graphics.getHeight(),
@@ -183,7 +183,7 @@ function levity:update(dt)
 
 		self.scripts:printLogs()
 
-		self:cleanupObjects(self.discardedobjectids)
+		self:cleanupObjects(self.discardedobjects)
 
 		if self.map.paused then
 			self.bank:update(0)
@@ -202,17 +202,17 @@ function levity:update(dt)
 end
 
 function levity:discardObject(id)
-	self.discardedobjectids[id] = id
+	self.discardedobjects[id] = self.map.objects[id]
 end
 
-function levity:cleanupObjects(discardedobjectids)
+function levity:cleanupObjects(discardedobjects)
 	local scripts = self.scripts
 
-	self.map:cleanupObjects(discardedobjectids)
+	self.map:cleanupObjects(discardedobjects)
 
-	for id, _ in pairs(discardedobjectids) do
+	for id, _ in pairs(discardedobjects) do
 		scripts:destroyIdScripts(id)
-		discardedobjectids[id] = nil
+		discardedobjects[id] = nil
 	end
 end
 

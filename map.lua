@@ -214,10 +214,8 @@ function Map.newObjectId(map)
 	return id
 end
 
-function Map.cleanupObjects(map, discardedobjectids)
-	for id, _ in pairs(discardedobjectids) do
-		local object = map.objects[id]
-
+function Map.cleanupObjects(map, discardedobjects)
+	for id, object in pairs(discardedobjects) do
 		Object.setLayer(object, nil)
 
 		if object.body then
