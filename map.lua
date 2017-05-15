@@ -243,17 +243,10 @@ function Map.cleanupObjects(map)
 	for id, _ in pairs(map.discardedobjects) do
 		map.discardedobjects[id] = nil
 	end
-
-	if map.overlaymap then
-		map.overlaymap:cleanupObjects()
-	end
 end
 
 function Map.broadcast(map, event, ...)
 	map.scripts:broadcast(event, ...)
-	if map.overlaymap then
-		map.overlaymap:broadcast(event, ...)
-	end
 end
 
 function Map.update(map, dt)
@@ -272,10 +265,6 @@ function Map.update(map, dt)
 	end
 
 	map:cleanupObjects()
-
-	if map.overlaymap then
-		map.overlaymap:update(dt)
-	end
 end
 
 local VisibleFixtures = {}
@@ -352,10 +341,6 @@ function Map.draw(map)
 
 	love.graphics.pop()
 
-	if map.overlaymap then
-		map.overlaymap:draw()
-	end
-
 	if map.canvas then
 		love.graphics.setCanvas()
 		local canvasscale = scale / intscale
@@ -369,9 +354,6 @@ function Map.draw(map)
 end
 
 function Map.destroy(map)
-	if map.overlaymap then
-		map.overlaymap:destroy()
-	end
 	map.discardedobjects = map.objects
 	map:cleanupObjects()
 	for _, body in pairs(map.world:getBodyList()) do
@@ -568,10 +550,6 @@ function Map.initScripts(map)
 	map.scripts:newScript(map.name, map.properties.script, map)
 
 	scripting.endScriptLoading()
-
-	if map.overlaymap then
-		map.overlaymap:initScripts()
-	end
 end
 
 function Map.windowResized(map, w, h)
@@ -592,8 +570,6 @@ local function incIdProperties(properties, incid)
 end
 
 local function mergeMaps(map1, map2)
-	local utils = require "sti.sti.utils"
-
 	--Bump gids
 	local lasttileset1 = map1.tilesets[#map1.tilesets]
 	local incgid = lasttileset1.firstgid + lasttileset1.tilecount - 1
@@ -617,6 +593,12 @@ local function mergeMaps(map1, map2)
 			tileset2.firstgid = tileset2.firstgid + incgid
 			map1.tilesets[#map1.tilesets + 1] = tileset2
 		end
+	end
+
+	--Object id references in properties
+	incIdProperties(map2.properties, incid)
+	for pn, pv in pairs(map2.properties) do
+		map1.properties[pn] = pv
 	end
 
 	local layers1 = map1.layers
@@ -646,6 +628,7 @@ local function mergeMaps(map1, map2)
 		local data = layer2.data
 
 		if layer2.encoding == "base64" then
+			local utils = require "sti.sti.utils"
 			require "ffi"
 
 			local fd  = love.filesystem.newFileData(data, "data",
@@ -677,7 +660,14 @@ end
 local function newMap(mapfile)
 	levity = require "levity"
 
-	local map = sti(mapfile, {"box2d"})
+	local map1 = love.filesystem.load(mapfile)()
+	if map1.properties.overlaymap then
+		local map2 = love.filesystem.load(map1.properties.overlaymap)()
+		map1 = mergeMaps(map1, map2)
+		map1.properties.overlaymap = nil
+	end
+
+	local map = sti(map1, {"box2d"})
 	for fname, f in pairs(Map) do
 		map[fname] = f
 	end
@@ -759,11 +749,6 @@ local function newMap(mapfile)
 	end
 	if map.properties.streamsounds then
 		levity.bank:load(map.properties.streamsounds, "stream")
-	end
-
-	if map.properties.overlaymap then
-		map.overlaymap = newMap(map.properties.overlaymap)
-		map.overlaymap.canvas = nil
 	end
 
 	return map
