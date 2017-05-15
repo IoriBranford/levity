@@ -57,11 +57,19 @@ function Layer.update(layer, dt, map, scripts)
 	end
 end
 
-function Layer.draw(layer, map, scripts)
+function Layer.draw(layer, map, camera, scripts)
 	love.graphics.push()
 	love.graphics.translate(layer.offsetx, layer.offsety)
 	for _, object in ipairs(layer.spriteobjects) do
-		object:draw(layer, map, scripts)
+		if object.visible and object:isOnCamera(camera) then
+			if scripts then
+				scripts:send(object.id, "beginDraw")
+			end
+			object:draw(map)
+			if scripts then
+				scripts:send(object.id, "endDraw")
+			end
+		end
 	end
 	love.graphics.pop()
 end

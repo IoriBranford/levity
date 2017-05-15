@@ -9,7 +9,6 @@ local CanvasMaxScale = 4
 
 --- @table Map
 -- @field objecttypes
--- @field camera
 -- @field discardedobjects
 -- @field paused
 
@@ -250,17 +249,17 @@ end
 
 local VisibleFixtures = {}
 
-function Map.draw(map, scripts, world)
+function Map.draw(map, camera, scripts, world)
 	if map.canvas then
 		love.graphics.setCanvas(map.canvas)
 		love.graphics.clear(0, 0, 0, 1, map.canvas)
 	end
 
-	local cx, cy = map.camera.x, map.camera.y
-	local cw, ch = map.camera.w, map.camera.h
+	local cx, cy = camera.x, camera.y
+	local cw, ch = camera.w, camera.h
 	local ccx, ccy = cx+cw*.5, cy+ch*.5
 
-	local scale = map.camera.scale
+	local scale = camera.scale
 	local intscale = math.min(math.floor(scale), CanvasMaxScale)
 
 	love.graphics.push()
@@ -279,7 +278,7 @@ function Map.draw(map, scripts, world)
 			local r,g,b,a = love.graphics.getColor()
 			love.graphics.setColor(r, g, b, a * layer.opacity)
 
-			layer:draw(map, scripts)
+			layer:draw(map, camera, scripts)
 
 			love.graphics.setColor(r,g,b,a)
 			if scripts then
@@ -348,30 +347,6 @@ function Map.destroy(map, scripts)
 	map.discardedobjects = map.objects
 	map:cleanupObjects(scripts)
 	sti:flush()
-end
-
-local function camera_set(camera, cx, cy, w, h)
-	if w then
-		camera.w = w
-	end
-	if h then
-		camera.h = h
-	end
-	if w or h then
-		local gw = love.graphics.getWidth()
-		local gh = love.graphics.getHeight()
-		camera.scale = math.min(gw/camera.w, gh/camera.h)
-	end
-	camera.x = (cx - camera.w * .5)
-	camera.y = (cy - camera.h * .5)
-end
-
-local function camera_zoom(camera, vz)
-	local aspect = camera.w / camera.h
-	camera:set(camera.x - vz*aspect*.5,
-		camera.y - vz*.5,
-		camera.w + vz*aspect,
-		camera.h + vz)
 end
 
 local function initTileset(tileset, tiles)
@@ -491,8 +466,7 @@ function Map.initScripts(map, scripts)
 	scripting.endScriptLoading()
 end
 
-function Map.windowResized(map, w, h)
-	local camera = map.camera
+function Map.windowResized(map, w, h, camera)
 	local scale = math.min(w/camera.w, h/camera.h)
 	local intscale = math.min(math.floor(scale), CanvasMaxScale)
 	map:resize(camera.w * intscale, camera.h * intscale)
@@ -633,13 +607,6 @@ local function newMap(mapfile)
 
 	map.name = mapfile
 	map.discardedobjects = {}
-	map.camera = {
-		x = 0, y = 0,
-		w = love.graphics.getWidth(), h = love.graphics.getHeight(),
-		scale = 1,
-		set = camera_set,
-		zoom = camera_zoom
-	}
 	map.paused = false
 
 	map.objecttypes = maputil.loadObjectTypesFile("objecttypes.xml")

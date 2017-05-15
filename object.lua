@@ -272,30 +272,25 @@ function Object.updateAnimation(object, dt, map, scripts)
 	end
 end
 
-function Object.draw(object, layer, map, scripts)
-	if object.visible == false then
-		return
-	end
+function Object.isOnCamera(object, camera)
+	local camw = camera.w
+	local camh = camera.h
+	local camcx = camera.x + camw*.5
+	local camcy = camera.y + camh*.5
+	local layer = object.layer
 
-	local camw = map.camera.w
-	local camh = map.camera.h
-	local camcx = map.camera.x + camw*.5
-	local camcy = map.camera.y + camh*.5
-	local tilesets = map.tilesets
+	return not (math.abs(layer.offsetx + object.x - camcx) > camw
+			or math.abs(layer.offsety + object.y - camcy) > camh)
+end
 
-	if math.abs(layer.offsetx + object.x - camcx) > camw or
-	math.abs(layer.offsety + object.y - camcy) > camh then
-		return
-	end
-
-	scripts:send(object.id, "beginDraw")
-
+function Object.draw(object, map)
 	local left = object.x
 	local top = object.y
 	local right = left + (object.width or 0)
 	local bottom = top + (object.height or 0)
 	if object.tile then
 		local tile = object.tile
+		local tilesets = map.tilesets
 		local tileset = tilesets[tile.tileset]
 		local x = object.x
 		local y = object.y
@@ -356,8 +351,6 @@ function Object.draw(object, layer, map, scripts)
 		love.graphics.printf(text, left, top, right - left,
 					textalign)--, object.rotation)
 	end
-
-	scripts:send(object.id, "endDraw")
 end
 
 return Object

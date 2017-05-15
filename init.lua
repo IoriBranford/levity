@@ -18,6 +18,7 @@ require "levity.class"
 
 --- @table levity
 -- @field map
+-- @field camera
 -- @field scripts
 -- @field world
 -- @field bank
@@ -81,6 +82,30 @@ local function initPhysics(self)
 	self.map:box2d_init(self.world)
 end
 
+local function camera_set(camera, cx, cy, w, h)
+	if w then
+		camera.w = w
+	end
+	if h then
+		camera.h = h
+	end
+	if w or h then
+		local gw = love.graphics.getWidth()
+		local gh = love.graphics.getHeight()
+		camera.scale = math.min(gw/camera.w, gh/camera.h)
+	end
+	camera.x = (cx - camera.w * .5)
+	camera.y = (cy - camera.h * .5)
+end
+
+local function camera_zoom(camera, vz)
+	local aspect = camera.w / camera.h
+	camera:set(camera.x - vz*aspect*.5,
+		camera.y - vz*.5,
+		camera.w + vz*aspect,
+		camera.h + vz)
+end
+
 function levity:loadNextMap()
 	love.audio.stop()
 
@@ -110,6 +135,13 @@ function levity:loadNextMap()
 	self.map = nil
 	collectgarbage()
 
+	self.camera = {
+		x = 0, y = 0,
+		w = love.graphics.getWidth(), h = love.graphics.getHeight(),
+		scale = 1,
+		set = camera_set,
+		zoom = camera_zoom
+	}
 	self.map = Map(self.mapfile)
 	self.map:loadFonts(self.fonts)
 	self.map:loadSounds(self.bank)
@@ -118,7 +150,7 @@ function levity:loadNextMap()
 	self.map:initScripts(self.scripts)
 
 	self.map:windowResized(love.graphics.getWidth(),
-				love.graphics.getHeight())
+				love.graphics.getHeight(), self.camera)
 	-- After initScripts because script is where camera size is set.
 
 	self.maxdt = 1/16
@@ -170,15 +202,15 @@ function levity:draw()
 		return
 	end
 
-	self.map:draw(self.scripts, self.drawbodies and self.world)
+	self.map:draw(self.camera, self.scripts, self.drawbodies and self.world)
 
 	self.stats:draw()
 end
 
 function levity:screenToCamera(x, y)
-	local scale = self.map.camera.scale
-	return	(x - love.graphics.getWidth() *.5)/scale + self.map.camera.w*.5,
-		(y - love.graphics.getHeight()*.5)/scale + self.map.camera.h*.5
+	local scale = self.camera.scale
+	return	(x - love.graphics.getWidth() *.5)/scale + self.camera.w*.5,
+		(y - love.graphics.getHeight()*.5)/scale + self.camera.h*.5
 end
 
 local NoFirstMapMessage =
@@ -294,7 +326,7 @@ function love.wheelmoved(x, y)
 end
 
 function love.resize(w, h)
-	levity.map:windowResized(w, h)
+	levity.map:windowResized(w, h, levity.camera)
 end
 
 function love.update(dt)
