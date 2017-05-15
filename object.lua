@@ -1,3 +1,4 @@
+local levity
 local maputil = require "levity.maputil"
 local Tiles = require "levity.tiles"
 
@@ -19,6 +20,7 @@ function Object.__lt(object1, object2)
 end
 
 function Object.init(object, layer, map)
+	levity = levity or require "levity"
 	object = setmetatable(object, Object)
 
 	if object.visible == nil then
@@ -72,7 +74,7 @@ function Object.init(object, layer, map)
 				object.properties.loop or false, points)
 		end
 
-		object.body = love.physics.newBody(map.world,
+		object.body = love.physics.newBody(levity.world,
 							object.x, object.y,
 							bodytype)
 		object.body:setAngle(angle)
@@ -189,7 +191,7 @@ function Object.setGid(object, gid, map, animated, bodytype, applyfixtures)
 			object.body:setType(bodytype)
 		end
 	else
-		object.body = love.physics.newBody(map.world,
+		object.body = love.physics.newBody(levity.world,
 						object.x, object.y, bodytype)
 		object.body:setAngle(math.rad(object.rotation))
 		object.body:setUserData({

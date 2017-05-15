@@ -8,6 +8,7 @@ require("pl.strict").module("_G", _G)
 local audio = require "levity.audio"
 local text = require "levity.text"
 local stats = require "levity.stats"
+local scripting = require "levity.scripting"
 
 local Map = require "levity.map"
 
@@ -17,6 +18,7 @@ require "levity.class"
 
 --- @table levity
 -- @field map
+-- @field world
 -- @field bank
 -- @field fonts
 -- @field stats
@@ -35,6 +37,49 @@ function levity:setNextMap(nextmapfile, nextmapdata)
 	self.nextmapdata = nextmapdata
 end
 
+local function collisionEvent(scripts, event, fixture, ...)
+	local ud = fixture:getBody():getUserData()
+	if ud then
+		local id = ud.id
+		if id then
+			scripts:send(id, event, fixture, ...)
+		end
+	end
+end
+
+local function initPhysics(self)
+	self.world = love.physics.newWorld(0, self.map.properties.gravity or 0)
+
+	local scripts = self.map.scripts
+
+	local function beginContact(fixture1, fixture2, contact)
+		collisionEvent(scripts, "beginContact", fixture1, fixture2, contact)
+		collisionEvent(scripts, "beginContact", fixture2, fixture1, contact)
+	end
+
+	local function endContact(fixture1, fixture2, contact)
+		collisionEvent(scripts, "endContact", fixture1, fixture2, contact)
+		collisionEvent(scripts, "endContact", fixture2, fixture1, contact)
+	end
+
+	local function preSolve(fixture1, fixture2, contact)
+		collisionEvent(scripts, "preSolve", fixture1, fixture2, contact)
+		collisionEvent(scripts, "preSolve", fixture2, fixture1, contact)
+	end
+
+	local function postSolve(fixture1, fixture2, contact,
+				normal1, tangent1, normal2, tangent2)
+		collisionEvent(scripts, "postSolve", fixture1, fixture2, contact,
+				normal1, tangent1, normal2, tangent2)
+		collisionEvent(scripts, "postSolve", fixture2, fixture1, contact,
+				normal1, tangent1, normal2, tangent2)
+	end
+
+	self.world:setCallbacks(beginContact, endContact, preSolve, postSolve)
+
+	self.map:box2d_init(self.world)
+end
+
 function levity:loadNextMap()
 	love.audio.stop()
 
@@ -44,6 +89,18 @@ function levity:loadNextMap()
 	if self.map then
 		self.map:destroy()
 	end
+
+	if self.world then
+		for _, body in pairs(self.world:getBodyList()) do
+			for _, fixture in pairs(body:getFixtureList()) do
+				fixture:setUserData(nil)
+			end
+			body:setUserData(nil)
+		end
+		self.world:setCallbacks(nil, nil, nil, nil)
+		self.world:destroy()
+	end
+
 	self.bank = audio.newBank()
 	self.fonts = text.newFonts()
 	self.stats = stats.newStats()
@@ -51,6 +108,8 @@ function levity:loadNextMap()
 	collectgarbage()
 
 	self.map = Map(self.mapfile)
+	self.map.scripts = scripting.newMachine()
+	initPhysics(self)
 	self.map:initScripts()
 
 	self.map:windowResized(love.graphics.getWidth(),
@@ -69,13 +128,30 @@ function levity:update(dt)
 	--dt = dt*self.timescale
 
 	while self.movetimer <= 0 do
-		self.map:update(self.movedt*self.timescale)
+		self.map.scripts:clearLogs()
+
+		local movedt = self.movedt * self.timescale
+		if self.map.paused then
+		else
+			self.map.scripts:broadcast("beginMove", movedt)
+			self.world:update(movedt)
+			self.map.scripts:broadcast("endMove", movedt)
+
+			for _, layer in ipairs(self.map.layers) do
+				layer:update(movedt, self.map)
+			end
+		end
+
+		self.map.scripts:printLogs()
+
+		self.map:cleanupObjects()
 
 		if self.map.paused then
 			self.bank:update(0)
 		else
-			self.bank:update(self.movedt*self.timescale)
+			self.bank:update(movedt)
 		end
+
 		self.movetimer = self.movetimer + self.movedt
 	end
 

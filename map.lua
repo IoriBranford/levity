@@ -11,7 +11,6 @@ local CanvasMaxScale = 4
 --- @table Map
 -- @field objecttypes
 -- @field scripts
--- @field world
 -- @field camera
 -- @field discardedobjects
 -- @field paused
@@ -249,27 +248,9 @@ function Map.broadcast(map, event, ...)
 	map.scripts:broadcast(event, ...)
 end
 
-function Map.update(map, dt)
-	map.scripts:clearLogs()
-
-	if map.paused then
-	else
-		map.scripts:broadcast("beginMove", dt)
-		map.world:update(dt)
-		map.scripts:broadcast("endMove", dt)
-
-		for _, layer in ipairs(map.layers) do
-			layer:update(dt, map)
-		end
-		map.scripts:printLogs()
-	end
-
-	map:cleanupObjects()
-end
-
 local VisibleFixtures = {}
 
-function Map.draw(map)
+function Map.draw(map, world)
 	if map.canvas then
 		love.graphics.setCanvas(map.canvas)
 		love.graphics.clear(0, 0, 0, 1, map.canvas)
@@ -300,8 +281,8 @@ function Map.draw(map)
 	end
 	map.scripts:send(map.name, "endDraw")
 
-	if levity.drawbodies then
-		map.world:queryBoundingBox(cx, cy, cx+cw, cy+ch,
+	if world then
+		world:queryBoundingBox(cx, cy, cx+cw, cy+ch,
 			function(fixture)
 				VisibleFixtures[#VisibleFixtures+1] = fixture
 				return true
@@ -356,14 +337,6 @@ end
 function Map.destroy(map)
 	map.discardedobjects = map.objects
 	map:cleanupObjects()
-	for _, body in pairs(map.world:getBodyList()) do
-		for _, fixture in pairs(body:getFixtureList()) do
-			fixture:setUserData(nil)
-		end
-		body:setUserData(nil)
-	end
-	map.world:setCallbacks(nil, nil, nil, nil)
-	map.world:destroy()
 	scripting.unloadScripts()
 	sti:flush()
 end
@@ -480,50 +453,7 @@ local function initTileset(tileset, tiles)
 	end
 end
 
-function Map.collisionEvent(map, event, fixture, ...)
-	local ud = fixture:getBody():getUserData()
-	if ud then
-		local id = ud.id
-		if id then
-			map.scripts:send(id, event, fixture, ...)
-		end
-	end
-end
-
-local function initPhysics(map)
-	map.world = love.physics.newWorld(0, map.properties.gravity or 0)
-
-	local function beginContact(fixture1, fixture2, contact)
-		map:collisionEvent("beginContact", fixture1, fixture2, contact)
-		map:collisionEvent("beginContact", fixture2, fixture1, contact)
-	end
-
-	local function endContact(fixture1, fixture2, contact)
-		map:collisionEvent("endContact", fixture1, fixture2, contact)
-		map:collisionEvent("endContact", fixture2, fixture1, contact)
-	end
-
-	local function preSolve(fixture1, fixture2, contact)
-		map:collisionEvent("preSolve", fixture1, fixture2, contact)
-		map:collisionEvent("preSolve", fixture2, fixture1, contact)
-	end
-
-	local function postSolve(fixture1, fixture2, contact,
-				normal1, tangent1, normal2, tangent2)
-		map:collisionEvent("postSolve", fixture1, fixture2, contact,
-				normal1, tangent1, normal2, tangent2)
-		map:collisionEvent("postSolve", fixture2, fixture1, contact,
-				normal1, tangent1, normal2, tangent2)
-	end
-
-	map.world:setCallbacks(beginContact, endContact, preSolve, postSolve)
-
-	map:box2d_init(map.world)
-end
-
 function Map.initScripts(map)
-	map.scripts = scripting.newMachine()
-
 	scripting.beginScriptLoading()
 	for i = 1, #map.layers do
 		local layer = map.layers[i]
@@ -741,8 +671,6 @@ local function newMap(mapfile)
 			layer.draworder = draworder
 		end
 	end
-
-	initPhysics(map)
 
 	if map.properties.staticsounds then
 		levity.bank:load(map.properties.staticsounds, "static")
