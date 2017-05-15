@@ -9,6 +9,7 @@ local audio = require "levity.audio"
 local text = require "levity.text"
 local stats = require "levity.stats"
 local scripting = require "levity.scripting"
+local sti = require "sti.sti"
 
 local Map = require "levity.map"
 
@@ -21,6 +22,7 @@ require "levity.class"
 -- @field camera
 -- @field scripts
 -- @field world
+-- @field discardedobjectids
 -- @field bank
 -- @field fonts
 -- @field stats
@@ -113,7 +115,8 @@ function levity:loadNextMap()
 	self.nextmapfile = nil
 
 	if self.map and self.scripts then
-		self.map:destroy(self.scripts)
+		self:cleanupObjects(self.map.objects)
+		sti:flush()
 	end
 
 	if self.world then
@@ -133,8 +136,7 @@ function levity:loadNextMap()
 	self.fonts = text.newFonts()
 	self.stats = stats.newStats()
 	self.map = nil
-	collectgarbage()
-
+	self.discardedobjectids = {}
 	self.camera = {
 		x = 0, y = 0,
 		w = love.graphics.getWidth(), h = love.graphics.getHeight(),
@@ -142,6 +144,9 @@ function levity:loadNextMap()
 		set = camera_set,
 		zoom = camera_zoom
 	}
+
+	collectgarbage()
+
 	self.map = Map(self.mapfile)
 	self.map:loadFonts(self.fonts)
 	self.map:loadSounds(self.bank)
@@ -178,7 +183,7 @@ function levity:update(dt)
 
 		self.scripts:printLogs()
 
-		self.map:cleanupObjects(self.scripts)
+		self:cleanupObjects(self.discardedobjectids)
 
 		if self.map.paused then
 			self.bank:update(0)
@@ -194,6 +199,21 @@ function levity:update(dt)
 	self.stats:update(dt)
 
 	self.movetimer = self.movetimer - dt
+end
+
+function levity:discardObject(id)
+	self.discardedobjectids[id] = id
+end
+
+function levity:cleanupObjects(discardedobjectids)
+	local scripts = self.scripts
+
+	self.map:cleanupObjects(discardedobjectids)
+
+	for id, _ in pairs(discardedobjectids) do
+		scripts:destroyIdScripts(id)
+		discardedobjectids[id] = nil
+	end
 end
 
 function levity:draw()

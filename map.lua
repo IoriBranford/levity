@@ -9,7 +9,6 @@ local CanvasMaxScale = 4
 
 --- @table Map
 -- @field objecttypes
--- @field discardedobjects
 -- @field paused
 
 local Map = {
@@ -215,12 +214,10 @@ function Map.newObjectId(map)
 	return id
 end
 
-function Map.discardObject(map, id)
-	map.discardedobjects[id] = map.objects[id]
-end
+function Map.cleanupObjects(map, discardedobjectids)
+	for id, _ in pairs(discardedobjectids) do
+		local object = map.objects[id]
 
-function Map.cleanupObjects(map, scripts)
-	for id, object in pairs(map.discardedobjects) do
 		Object.setLayer(object, nil)
 
 		if object.body then
@@ -231,13 +228,7 @@ function Map.cleanupObjects(map, scripts)
 			object.body:destroy()
 		end
 
-		scripts:destroyIdScripts(id)
-
 		map.objects[id] = nil
-	end
-
-	for id, _ in pairs(map.discardedobjects) do
-		map.discardedobjects[id] = nil
 	end
 end
 
@@ -341,12 +332,6 @@ function Map.draw(map, camera, scripts, world)
 					map.canvas:getWidth()*.5,
 					map.canvas:getHeight()*.5)
 	end
-end
-
-function Map.destroy(map, scripts)
-	map.discardedobjects = map.objects
-	map:cleanupObjects(scripts)
-	sti:flush()
 end
 
 local function initTileset(tileset, tiles)
@@ -606,7 +591,6 @@ local function newMap(mapfile)
 	end
 
 	map.name = mapfile
-	map.discardedobjects = {}
 	map.paused = false
 
 	map.objecttypes = maputil.loadObjectTypesFile("objecttypes.xml")
