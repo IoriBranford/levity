@@ -96,7 +96,7 @@ function Object.init(object, layer, map)
 	end
 
 	map.objects[object.id] = object
-	map.scripts:newScript(object.id, object.properties.script, object)
+	levity.scripts:newScript(object.id, object.properties.script, object)
 end
 
 local function addFixture(object, shapeobj, map)
@@ -243,6 +243,121 @@ function Object.setLayer(object, layer)
 		end
 	end
 	object.layer = layer
+end
+
+function Object.updateAnimation(object, dt, map, scripts)
+	local animation = object.animation
+
+	local advanceframe = false
+	local looped = false
+	object.anitime = object.anitime + dt * 1000 * object.anitimescale
+	while object.anitime > (animation[object.aniframe].duration) do
+		advanceframe = true
+		object.anitime  = object.anitime -
+		(animation[object.aniframe].duration)
+		object.aniframe = object.aniframe + 1
+		if object.aniframe > #animation then
+			looped = true
+			object.aniframe = 1
+		end
+	end
+
+	if advanceframe then
+		local tileid = (animation[object.aniframe].tileid)
+		object.tile = map:getTile(object.tile.tileset, tileid)
+	end
+
+	if looped then
+		scripts:send(object.id, "loopedAnimation")
+	end
+end
+
+function Object.draw(object, layer, map, scripts)
+	if object.visible == false then
+		return
+	end
+
+	local camw = map.camera.w
+	local camh = map.camera.h
+	local camcx = map.camera.x + camw*.5
+	local camcy = map.camera.y + camh*.5
+	local tilesets = map.tilesets
+
+	if math.abs(layer.offsetx + object.x - camcx) > camw or
+	math.abs(layer.offsety + object.y - camcy) > camh then
+		return
+	end
+
+	scripts:send(object.id, "beginDraw")
+
+	local left = object.x
+	local top = object.y
+	local right = left + (object.width or 0)
+	local bottom = top + (object.height or 0)
+	if object.tile then
+		local tile = object.tile
+		local tileset = tilesets[tile.tileset]
+		local x = object.x
+		local y = object.y
+		local ox = -tile.offset.x
+		local oy = -tile.offset.y + tileset.tileheight
+		local sx, sy = 1, 1
+		local flipx, flipy = Tiles.getGidFlip(object.gid)
+		if flipx then
+			ox = tileset.tilewidth - ox
+			sx = -1
+		end
+		if flipy then
+			oy = tileset.tileheight - oy
+			sy = -1
+		end
+		left = x - ox
+		top = y - oy
+		right = left + tileset.tilewidth
+		bottom = top + tileset.tileheight
+
+		love.graphics.draw(tileset.image, tile.quad, x, y,
+			object.rotation, sx, sy, ox, oy)
+	elseif object.body then
+		local body = object.body
+		for j, fixture in ipairs(body:getFixtureList()) do
+			local l, t, r, b = fixture:getBoundingBox()
+			left = math.min(left, l)
+			top = math.min(top, t)
+			right = math.max(right, r)
+			bottom = math.max(bottom, b)
+
+			local shape = fixture:getShape()
+			if shape:getType() == "circle" then
+				local x, y = body:getWorldPoint(
+					shape:getPoint())
+				love.graphics.circle("line", x, y,
+					shape:getRadius())
+			elseif shape:getType() == "polygon" then
+				love.graphics.polygon("line",
+				body:getWorldPoints(shape:getPoints()))
+			elseif shape:getType() == "chain" then
+				love.graphics.line(
+				body:getWorldPoints(shape:getPoints()))
+			end
+		end
+	end
+
+	local text = object.properties.text
+	if text then
+		local textfont = object.properties.textfont
+		if textfont then
+			levity = levity or require "levity" --TEMP
+			levity.fonts:use(textfont)
+		end
+
+		local textalign = object.properties.textalign or "center"
+
+		love.graphics.printf(text, left, top, right - left,
+					textalign)--, object.rotation)
+	end
+
+	scripts:send(object.id, "endDraw")
 end
 
 return Object

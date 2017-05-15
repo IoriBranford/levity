@@ -18,6 +18,7 @@ require "levity.class"
 
 --- @table levity
 -- @field map
+-- @field scripts
 -- @field world
 -- @field bank
 -- @field fonts
@@ -50,7 +51,7 @@ end
 local function initPhysics(self)
 	self.world = love.physics.newWorld(0, self.map.properties.gravity or 0)
 
-	local scripts = self.map.scripts
+	local scripts = self.scripts
 
 	local function beginContact(fixture1, fixture2, contact)
 		collisionEvent(scripts, "beginContact", fixture1, fixture2, contact)
@@ -86,8 +87,8 @@ function levity:loadNextMap()
 	self.mapfile = self.nextmapfile
 	self.nextmapfile = nil
 
-	if self.map then
-		self.map:destroy()
+	if self.map and self.scripts then
+		self.map:destroy(self.scripts)
 	end
 
 	if self.world then
@@ -101,6 +102,8 @@ function levity:loadNextMap()
 		self.world:destroy()
 	end
 
+	scripting.unloadScripts()
+
 	self.bank = audio.newBank()
 	self.fonts = text.newFonts()
 	self.stats = stats.newStats()
@@ -108,9 +111,11 @@ function levity:loadNextMap()
 	collectgarbage()
 
 	self.map = Map(self.mapfile)
-	self.map.scripts = scripting.newMachine()
+	self.map:loadFonts(self.fonts)
+	self.map:loadSounds(self.bank)
+	self.scripts = scripting.newMachine()
 	initPhysics(self)
-	self.map:initScripts()
+	self.map:initScripts(self.scripts)
 
 	self.map:windowResized(love.graphics.getWidth(),
 				love.graphics.getHeight())
@@ -128,23 +133,20 @@ function levity:update(dt)
 	--dt = dt*self.timescale
 
 	while self.movetimer <= 0 do
-		self.map.scripts:clearLogs()
+		self.scripts:clearLogs()
 
 		local movedt = self.movedt * self.timescale
 		if self.map.paused then
 		else
-			self.map.scripts:broadcast("beginMove", movedt)
+			self.scripts:broadcast("beginMove", movedt)
 			self.world:update(movedt)
-			self.map.scripts:broadcast("endMove", movedt)
-
-			for _, layer in ipairs(self.map.layers) do
-				layer:update(movedt, self.map)
-			end
+			self.scripts:broadcast("endMove", movedt)
+			self.map:update(movedt, self.scripts)
 		end
 
-		self.map.scripts:printLogs()
+		self.scripts:printLogs()
 
-		self.map:cleanupObjects()
+		self.map:cleanupObjects(self.scripts)
 
 		if self.map.paused then
 			self.bank:update(0)
@@ -168,7 +170,7 @@ function levity:draw()
 		return
 	end
 
-	self.map:draw()
+	self.map:draw(self.scripts, self.drawbodies and self.world)
 
 	self.stats:draw()
 end
@@ -221,74 +223,74 @@ function love.load()
 end
 
 function love.keypressed(key, u)
-	levity.map:broadcast("keypressed", key, u)
-	levity.map:broadcast("keypressed_"..key, u)
+	levity.scripts:broadcast("keypressed", key, u)
+	levity.scripts:broadcast("keypressed_"..key, u)
 end
 
 function love.keyreleased(key, u)
-	levity.map:broadcast("keyreleased", key, u)
-	levity.map:broadcast("keyreleased_"..key, u)
+	levity.scripts:broadcast("keyreleased", key, u)
+	levity.scripts:broadcast("keyreleased_"..key, u)
 end
 
 function love.touchpressed(touch, x, y, dx, dy, pressure)
-	levity.map:broadcast("touchpressed", touch, x, y)
+	levity.scripts:broadcast("touchpressed", touch, x, y)
 end
 
 function love.touchmoved(touch, x, y, dx, dy, pressure)
-	levity.map:broadcast("touchmoved", touch, x, y, dx, dy)
+	levity.scripts:broadcast("touchmoved", touch, x, y, dx, dy)
 end
 
 function love.touchreleased(touch, x, y, dx, dy, pressure)
-	levity.map:broadcast("touchreleased", touch, x, y, dx, dy)
+	levity.scripts:broadcast("touchreleased", touch, x, y, dx, dy)
 end
 
 function love.joystickaxis(joystick, axis, value)
-	levity.map:broadcast("joystickaxis", joystick, axis, value)
+	levity.scripts:broadcast("joystickaxis", joystick, axis, value)
 end
 
 function love.joystickpressed(joystick, button)
-	levity.map:broadcast("joystickpressed", joystick, button)
+	levity.scripts:broadcast("joystickpressed", joystick, button)
 end
 
 function love.joystickreleased(joystick, button)
-	levity.map:broadcast("joystickreleased", joystick, button)
+	levity.scripts:broadcast("joystickreleased", joystick, button)
 end
 
 function love.gamepadaxis(joystick, axis, value)
-	levity.map:broadcast("gamepadaxis", joystick, axis, value)
+	levity.scripts:broadcast("gamepadaxis", joystick, axis, value)
 end
 
 function love.gamepadpressed(joystick, button)
-	levity.map:broadcast("gamepadpressed", joystick, button)
+	levity.scripts:broadcast("gamepadpressed", joystick, button)
 end
 
 function love.gamepadreleased(joystick, button)
-	levity.map:broadcast("gamepadreleased", joystick, button)
+	levity.scripts:broadcast("gamepadreleased", joystick, button)
 end
 
 function love.mousepressed(x, y, button, istouch)
 	if istouch then
 		return
 	end
-	levity.map:broadcast("mousepressed", x, y, button, istouch)
+	levity.scripts:broadcast("mousepressed", x, y, button, istouch)
 end
 
 function love.mousemoved(x, y, dx, dy, istouch)
 	if istouch then
 		return
 	end
-	levity.map:broadcast("mousemoved", x, y, dx, dy)
+	levity.scripts:broadcast("mousemoved", x, y, dx, dy)
 end
 
 function love.mousereleased(x, y, button, istouch)
 	if istouch then
 		return
 	end
-	levity.map:broadcast("mousereleased", x, y, button, istouch)
+	levity.scripts:broadcast("mousereleased", x, y, button, istouch)
 end
 
 function love.wheelmoved(x, y)
-	levity.map:broadcast("wheelmoved", x, y)
+	levity.scripts:broadcast("wheelmoved", x, y)
 end
 
 function love.resize(w, h)
@@ -299,7 +301,7 @@ function love.update(dt)
 	levity:update(dt)
 
 	if levity.nextmapfile then
-		levity.map:broadcast("nextMap",
+		levity.scripts:broadcast("nextMap",
 			levity.nextmapfile, levity.nextmapdata)
 		levity:loadNextMap()
 	end

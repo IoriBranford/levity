@@ -1,4 +1,3 @@
-local levity
 local scripting = require "levity.scripting"
 local maputil = require "levity.maputil"
 local sti = require "sti.sti"
@@ -10,7 +9,6 @@ local CanvasMaxScale = 4
 
 --- @table Map
 -- @field objecttypes
--- @field scripts
 -- @field camera
 -- @field discardedobjects
 -- @field paused
@@ -222,7 +220,7 @@ function Map.discardObject(map, id)
 	map.discardedobjects[id] = map.objects[id]
 end
 
-function Map.cleanupObjects(map)
+function Map.cleanupObjects(map, scripts)
 	for id, object in pairs(map.discardedobjects) do
 		Object.setLayer(object, nil)
 
@@ -234,7 +232,7 @@ function Map.cleanupObjects(map)
 			object.body:destroy()
 		end
 
-		map.scripts:destroyIdScripts(id)
+		scripts:destroyIdScripts(id)
 
 		map.objects[id] = nil
 	end
@@ -244,13 +242,15 @@ function Map.cleanupObjects(map)
 	end
 end
 
-function Map.broadcast(map, event, ...)
-	map.scripts:broadcast(event, ...)
+function Map.update(map, dt, scripts)
+	for _, layer in ipairs(map.layers) do
+		layer:update(dt, map, scripts)
+	end
 end
 
 local VisibleFixtures = {}
 
-function Map.draw(map, world)
+function Map.draw(map, scripts, world)
 	if map.canvas then
 		love.graphics.setCanvas(map.canvas)
 		love.graphics.clear(0, 0, 0, 1, map.canvas)
@@ -268,18 +268,28 @@ function Map.draw(map, world)
 				-math.floor(cy * intscale))
 	love.graphics.scale(intscale, intscale)
 
-	map.scripts:send(map.name, "beginDraw")
+	if scripts then
+		scripts:send(map.name, "beginDraw")
+	end
 	for _, layer in ipairs(map.layers) do
 		if layer.visible and layer.opacity > 0 then
-			map.scripts:send(layer.name, "beginDraw")
+			if scripts then
+				scripts:send(layer.name, "beginDraw")
+			end
 			local r,g,b,a = love.graphics.getColor()
 			love.graphics.setColor(r, g, b, a * layer.opacity)
-			layer:draw(map)
+
+			layer:draw(map, scripts)
+
 			love.graphics.setColor(r,g,b,a)
-			map.scripts:send(layer.name, "endDraw")
+			if scripts then
+				scripts:send(layer.name, "endDraw")
+			end
 		end
 	end
-	map.scripts:send(map.name, "endDraw")
+	if scripts then
+		scripts:send(map.name, "endDraw")
+	end
 
 	if world then
 		world:queryBoundingBox(cx, cy, cx+cw, cy+ch,
@@ -334,10 +344,9 @@ function Map.draw(map, world)
 	end
 end
 
-function Map.destroy(map)
+function Map.destroy(map, scripts)
 	map.discardedobjects = map.objects
-	map:cleanupObjects()
-	scripting.unloadScripts()
+	map:cleanupObjects(scripts)
 	sti:flush()
 end
 
@@ -453,7 +462,7 @@ local function initTileset(tileset, tiles)
 	end
 end
 
-function Map.initScripts(map)
+function Map.initScripts(map, scripts)
 	scripting.beginScriptLoading()
 	for i = 1, #map.layers do
 		local layer = map.layers[i]
@@ -474,10 +483,10 @@ function Map.initScripts(map)
 			end
 		end
 
-		map.scripts:newScript(layer.name, layer.properties.script, layer)
+		scripts:newScript(layer.name, layer.properties.script, layer)
 	end
 
-	map.scripts:newScript(map.name, map.properties.script, map)
+	scripts:newScript(map.name, map.properties.script, map)
 
 	scripting.endScriptLoading()
 end
@@ -587,14 +596,34 @@ local function mergeMaps(map1, map2)
 	return map1
 end
 
-local function newMap(mapfile)
-	levity = require "levity"
+function Map.loadFonts(map, fonts)
+	for l = 1, #map.layers do
+		local objects = map.layers[l].objects
+		if objects then
+			for _, object in pairs(objects) do
+				local textfont = object.properties.textfont
+				if textfont then
+					fonts:load(textfont)
+				end
+			end
+		end
+	end
+end
 
+function Map.loadSounds(map, bank)
+	if map.properties.staticsounds then
+		bank:load(map.properties.staticsounds, "static")
+	end
+	if map.properties.streamsounds then
+		bank:load(map.properties.streamsounds, "stream")
+	end
+end
+
+local function newMap(mapfile)
 	local map1 = love.filesystem.load(mapfile)()
 	if map1.properties.overlaymap then
 		local map2 = love.filesystem.load(map1.properties.overlaymap)()
 		map1 = mergeMaps(map1, map2)
-		map1.properties.overlaymap = nil
 	end
 
 	local map = sti(map1, {"box2d"})
@@ -656,11 +685,6 @@ local function newMap(mapfile)
 
 			layer = Layer(map, name, l)
 			for _, object in pairs(objects) do
-				local textfont = object.properties.textfont
-				if textfont then
-					levity.fonts:load(textfont)
-				end
-
 				Object.setLayer(object, layer)
 			end
 
@@ -670,13 +694,6 @@ local function newMap(mapfile)
 			layer.properties = properties
 			layer.draworder = draworder
 		end
-	end
-
-	if map.properties.staticsounds then
-		levity.bank:load(map.properties.staticsounds, "static")
-	end
-	if map.properties.streamsounds then
-		levity.bank:load(map.properties.streamsounds, "stream")
 	end
 
 	return map
