@@ -476,19 +476,13 @@ local function mergeMaps(map1, map2)
 	--Next object id
 	map1.nextobjectid = incid + map2.nextobjectid
 
-	local tilesets1 = {}
+	local tilesets1 = map1.tilesets
 	local tilesets2 = map2.tilesets
-	for i = 1, #map1.tilesets do
-		local tileset1 = map1.tilesets[i]
-		tilesets1[tileset1.name] = tileset1
-	end
 	for i = 1, #tilesets2 do
 		local tileset2 = tilesets2[i]
-		if not tilesets1[tileset2.name] then
-			--Tileset firstgids
-			tileset2.firstgid = tileset2.firstgid + incgid
-			map1.tilesets[#map1.tilesets + 1] = tileset2
-		end
+		--Tileset firstgids
+		tileset2.firstgid = tileset2.firstgid + incgid
+		tilesets1[#tilesets1 + 1] = tileset2
 	end
 
 	--Object id references in properties
