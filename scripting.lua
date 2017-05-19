@@ -101,6 +101,9 @@ function Machine:destroyIdScripts(id)
 end
 
 function Machine:destroyScript(script, id)
+	if not script then
+		return
+	end
 	if id then
 		local idscripts = self.idscripts[id]
 		if idscripts then
