@@ -19,6 +19,25 @@ function Object.__lt(object1, object2)
 	return dy < 0 or (dy == 0 and object1.id < object2.id)
 end
 
+local function addFixture(body, shape, object)
+	local fixture = love.physics.newFixture(body, shape)
+	fixture:setSensor(object.properties.sensor == true)
+	fixture:setUserData({
+		id = object.id,
+		object = object,
+		properties = object.properties
+	})
+
+	local collisionrules = levity.collisionrules
+	local category = object.properties.category
+	if category and collisionrules then
+		category = "Category_"..category
+		fixture:setCategory(levity.collisionrules[category])
+	end
+
+	return fixture
+end
+
 function Object.init(object, layer, map)
 	levity = levity or require "levity"
 	object = setmetatable(object, Object)
@@ -43,37 +62,10 @@ function Object.init(object, layer, map)
 
 	Object.setLayer(object, layer)
 
-	local shape = nil
 	if object.gid then
 		object:setGid(object.gid, map, true, bodytype)
 	else
 		local angle = math.rad(object.rotation)
-		if object.shape == "rectangle" then
-			shape = love.physics.newRectangleShape(
-				object.width * .5, object.height * .5,
-				object.width, object.height)
-		elseif object.shape == "ellipse" then
-			-- workaround for worldcenter always matching position
-			-- in this case, for some reason
-			local halfw, halfh = object.width*.5, object.height*.5
-			local cos = math.cos(angle)
-			local sin = math.sin(angle)
-			object.x, object.y =
-				object.x + halfw*cos - halfh*sin,
-				object.y + halfw*sin + halfh*cos
-			shape = love.physics.newCircleShape(0, 0,
-				(object.width + object.height) * .25)
-		elseif object.shape == "polyline" then
-			local points = {}
-			for _, point in ipairs(object.polyline) do
-				-- sti converts them to world points
-				table.insert(points, point.x - object.x)
-				table.insert(points, point.y - object.y)
-			end
-			shape = love.physics.newChainShape(
-				object.properties.loop or false, points)
-		end
-
 		object.body = love.physics.newBody(levity.world,
 							object.x, object.y,
 							bodytype)
@@ -88,10 +80,38 @@ function Object.init(object, layer, map)
 		local collidable =
 			object.properties.collidable == true or
 			layer.properties.collidable == true
-		if shape and collidable then
-			local fixture = love.physics.newFixture(object.body, shape)
-			fixture:setUserData(userdata)
-			fixture:setSensor(object.properties.sensor == true)
+
+		if collidable then
+			local shape = nil
+			if object.shape == "rectangle" then
+				shape = love.physics.newRectangleShape(
+					object.width * .5, object.height * .5,
+					object.width, object.height)
+			elseif object.shape == "ellipse" then
+				-- workaround for worldcenter always matching position
+				-- in this case, for some reason
+				local halfw, halfh = object.width*.5, object.height*.5
+				local cos = math.cos(angle)
+				local sin = math.sin(angle)
+				object.x, object.y =
+					object.x + halfw*cos - halfh*sin,
+					object.y + halfw*sin + halfh*cos
+				shape = love.physics.newCircleShape(0, 0,
+					(object.width + object.height) * .25)
+			elseif object.shape == "polyline" then
+				local points = {}
+				for _, point in ipairs(object.polyline) do
+					-- sti converts them to world points
+					table.insert(points, point.x - object.x)
+					table.insert(points, point.y - object.y)
+				end
+				shape = love.physics.newChainShape(
+					object.properties.loop or false, points)
+			end
+
+			if shape then
+				addFixture(object.body, shape, object)
+			end
 		end
 	end
 
@@ -99,10 +119,7 @@ function Object.init(object, layer, map)
 	levity.scripts:newScript(object.id, object.properties.script, object)
 end
 
-local function addFixture(object, shapeobj, map)
-	local bodyud = object.body:getUserData()
-
-	local tileset = map.tilesets[object.tile.tileset]
+local function addTileFixture(object, shapeobj, tileset)
 	local tilewidth = tileset.tilewidth
 	local tileheight = tileset.tileheight
 
@@ -121,34 +138,21 @@ local function addFixture(object, shapeobj, map)
 
 	local shape
 	if shapeobj.shape == "rectangle" then
-		shape = love.physics.newRectangleShape(
-			shapecx, shapecy,
+		shape = love.physics.newRectangleShape(shapecx, shapecy,
 			shapeobj.width, shapeobj.height)
 	elseif shapeobj.shape == "ellipse" then
-		shape = love.physics.newCircleShape(
-			shapecx, shapecy,
+		shape = love.physics.newCircleShape(shapecx, shapecy,
 			(shapeobj.width + shapeobj.height) * .25)
 	end
 
-	if shape then
-		local fixture = love.physics.newFixture(
-					object.body, shape)
-		fixture:setSensor(shapeobj.properties.sensor == true)
-		local fixtureud = {
-			--id = shapeobj.id,
-			--need Tiled issue fixed:
-			--github.com/bjorn/tiled/issues/1052
-			object = shapeobj,
-			properties = shapeobj.properties
-		}
-		fixture:setUserData(fixtureud)
+	local fixture = addFixture(object.body, shape, shapeobj)
 
-		if shapeobj.name ~= "" then
-			if not bodyud.fixtures then
-				bodyud.fixtures = {}
-			end
-			bodyud.fixtures[shapeobj.name] = fixture
+	if shapeobj.name ~= "" then
+		local bodyud = object.body:getUserData()
+		if not bodyud.fixtures then
+			bodyud.fixtures = {}
 		end
+		bodyud.fixtures[shapeobj.name] = fixture
 	end
 end
 
@@ -206,7 +210,7 @@ function Object.setGid(object, gid, map, animated, bodytype, applyfixtures)
 	if applyfixtures and objectgroup then
 		for i, shapeobj in ipairs(objectgroup.objects) do
 			if shapeobj.properties.collidable == true then
-				addFixture(object, shapeobj, map)
+				addTileFixture(object, shapeobj, newtileset)
 			end
 		end
 	end

@@ -22,6 +22,7 @@ require "levity.class"
 -- @field camera
 -- @field scripts
 -- @field world
+-- @field collisionrules
 -- @field discardedobjects
 -- @field bank
 -- @field fonts

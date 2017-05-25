@@ -61,11 +61,11 @@ function Layer.draw(layer, map, camera, scripts)
 	love.graphics.push()
 	love.graphics.translate(layer.offsetx, layer.offsety)
 	for _, object in ipairs(layer.spriteobjects) do
-		if object.visible and object:isOnCamera(camera) then
+		if object.visible and Object.isOnCamera(object, camera) then
 			if scripts then
 				scripts:send(object.id, "beginDraw")
 			end
-			object:draw(map)
+			Object.draw(object, map)
 			if scripts then
 				scripts:send(object.id, "endDraw")
 			end
