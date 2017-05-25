@@ -52,7 +52,7 @@ function Layer.update(layer, dt, map, scripts)
 		end
 	end
 
-	if layer.draworder == "topdown" then
+	if layer.visible and layer.draworder == "topdown" then
 		table.sort(layer.spriteobjects, Object.__lt)
 	end
 end
