@@ -21,12 +21,16 @@ local LayerAddedTooManyObjectsMessage =
 layer. Avoid recursive object creation in object init functions.]]
 
 function Layer.update(layer, dt, map, scripts)
+	local newobjects = layer.newobjects
 	local i0 = 1
-	local i1 = #layer.newobjects
+	local i1 = #newobjects
 
 	while i0 <= i1 do
 		for i = i0, i1 do
-			Object.init(layer.newobjects[i], layer, map)
+			Object.init(newobjects[i], layer, map)
+		end
+		for i = i0, i1 do
+			scripts:send(newobjects[i].id, "start")
 		end
 
 		i0 = i1 + 1

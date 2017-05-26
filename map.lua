@@ -422,6 +422,7 @@ end
 
 function Map.initScripts(map, scripts)
 	scripting.beginScriptLoading()
+
 	for i = 1, #map.layers do
 		local layer = map.layers[i]
 
@@ -445,6 +446,16 @@ function Map.initScripts(map, scripts)
 	end
 
 	scripts:newScript(map.name, map.properties.script, map)
+
+	if not map.properties.delayinitobjects then
+		for _, object in pairs(map.objects) do
+			scripts:send(object.id, "start")
+		end
+		for i = 1, #map.layers do
+			scripts:send(map.layers[i].name, "start")
+		end
+		scripts:send(map.name, "start")
+	end
 
 	scripting.endScriptLoading()
 end
