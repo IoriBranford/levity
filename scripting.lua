@@ -2,6 +2,16 @@
 
 require "levity.class"
 
+local LockMT = {}
+
+local function broadcast__newindex(t,k,v)
+	error("Cannot add new script that receives current broadcasting event")
+end
+
+local function send__newindex(t,k,v)
+	error("Cannot add new script for current receiving id")
+end
+
 local Machine = class(function(self)
 	self.eventscripts = {}
 	self.idscripts = {}
@@ -115,7 +125,9 @@ function Machine:destroyScript(script, id)
 		end
 	end
 	for event, scripts in pairs(self.eventscripts) do
-		scripts[script] = nil
+		if scripts[script] then
+			scripts[script] = nil
+		end
 	end
 end
 
@@ -125,6 +137,8 @@ function Machine:call(id, event, ...)
 		return
 	end
 
+	LockMT.__newindex = send__newindex
+	setmetatable(idscripts, LockMT)
 	for _, script in pairs(idscripts) do
 		local log = self.logs[script]
 		if log then
@@ -135,6 +149,7 @@ function Machine:call(id, event, ...)
 			return func(script, ...)
 		end
 	end
+	setmetatable(idscripts, nil)
 end
 
 --- Send event to one id's scripts
@@ -147,6 +162,8 @@ function Machine:send(id, event, ...)
 		return
 	end
 
+	LockMT.__newindex = send__newindex
+	setmetatable(idscripts, LockMT)
 	for _, script in pairs(idscripts) do
 		local log = self.logs[script]
 		if log then
@@ -157,6 +174,7 @@ function Machine:send(id, event, ...)
 			func(script, ...)
 		end
 	end
+	setmetatable(idscripts, nil)
 end
 
 --- Send event to all interested scripts
@@ -168,6 +186,8 @@ function Machine:broadcast(event, ...)
 		return
 	end
 
+	LockMT.__newindex = broadcast__newindex
+	setmetatable(scripts, LockMT)
 	for _, script in pairs(scripts) do
 		local log = self.logs[script]
 		if log then
@@ -175,6 +195,7 @@ function Machine:broadcast(event, ...)
 		end
 		script[event](script, ...)
 	end
+	setmetatable(scripts, nil)
 end
 
 --- Start logging events for a script
