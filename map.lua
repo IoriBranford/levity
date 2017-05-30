@@ -26,7 +26,7 @@ function Map.getTileGid(map, tilesetid, row, column)
 	if not column then
 		tileid = row
 		if type(tileid) == "string" then
-			tileid = tileset.namedtileids[tileid]
+			tileid = tileset.namedtiles[tileid]
 		end
 	elseif row then
 		if type(column) == "string" then
@@ -79,11 +79,14 @@ function Map.tileGidsToNames(map, gids)
 		return nil
 	end
 	local names = {}
+	local tiles = map.tiles
 	for _, gid in ipairs(gids) do
-		local tileset = map.tilesets[map.tiles[gid].tileset]
-
+		local tile = tiles[gid]
+		local tileset = map.tilesets[tile.tileset]
+		local name = tile.properties and tile.properties.name
 		names[#names + 1] = {
 			tileset = tileset.name,
+			tile = name,
 			row = map:getTileRowName(gid),
 			column = map:getTileColumnName(gid)
 		}
@@ -336,7 +339,7 @@ local function initTileset(tileset, tiles)
 	tileset.tilecolumns =
 		math.floor(tileset.imagewidth / tileset.tilewidth)
 
-	tileset.namedtileids = {}
+	tileset.namedtiles = {}
 	tileset.namedrows = {}
 	tileset.namedcols = {}
 	tileset.rownames = {}
@@ -367,8 +370,8 @@ local function initTileset(tileset, tiles)
 		if tile.properties then
 			local name = tile.properties.name
 			if name then
-				--tileset.tilenames[tile.id] = tilename
-				tileset.namedtileids[name] = tile.id
+				--tileset.tilenames[tile.id] = name
+				tileset.namedtiles[name] = tile.id
 			end
 		end
 	end
@@ -588,6 +591,12 @@ local function newMap(mapfile)
 		map1 = mergeMaps(map1, map2)
 	end
 
+	for _, layer in ipairs(map1.layers) do
+		if layer.objects and layer.properties.static ~= true then
+			layer.type = "dynamiclayer"
+		end
+	end
+
 	local map = sti(map1, {"box2d"})
 	for fname, f in pairs(Map) do
 		map[fname] = f
@@ -619,34 +628,13 @@ local function newMap(mapfile)
 		initTileset(tileset, map.tiles)
 	end
 
-	for l = #map.layers, 1, -1 do
-		local layer = map.layers[l]
-		local layerdynamic = (layer.properties.static ~= true)
-
-		if layer.objects and layerdynamic then
-			local name = layer.name
-			local visible = layer.visible
-			local objects = layer.objects
-			local offsetx = layer.offsetx
-			local offsety = layer.offsety
-			local properties = layer.properties
-			local draworder = layer.draworder
-
-			for _, object in pairs(objects) do
-				object.layer = nil
+	for _, layer in ipairs(map.layers) do
+		if layer.type == "dynamiclayer" then
+			map:setObjectCoordinates(layer)
+			Layer.init(layer)
+			for _, object in pairs(layer.objects) do
+				map.objects[object.id] = object
 			end
-			map:removeLayer(l)
-
-			layer = Layer(map, name, l)
-			for _, object in pairs(objects) do
-				Object.setLayer(object, layer)
-			end
-
-			layer.visible = visible
-			layer.offsetx = offsetx
-			layer.offsety = offsety
-			layer.properties = properties
-			layer.draworder = draworder
 		end
 	end
 

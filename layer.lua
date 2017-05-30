@@ -78,12 +78,13 @@ function Layer.draw(layer, map, camera, scripts)
 	love.graphics.pop()
 end
 
-local function newLayer(map, name, i)
-	local layer = map:addCustomLayer(name, i)
+function Layer.init(layer)
 	--TODO: Why doesn't setting metatable work here?
 	--setmetatable(layer, Layer)
 	for fname, f in pairs(Layer) do
-		layer[fname] = f
+		if fname ~= "__call" then
+			layer[fname] = f
+		end
 	end
 
 	layer.type = "dynamiclayer"
@@ -93,12 +94,28 @@ local function newLayer(map, name, i)
 	-- "The behavior of next [and therefore pairs] is undefined if, during
 	-- the traversal, you assign any value to a non-existent field in the
 	-- table [i.e. a new object]."
-	layer.objects = {}
 	layer.spriteobjects = {}
-	layer.offsetx = 0
-	layer.offsety = 0
+	if layer.objects then
+		if layer.draworder == "topdown" then
+			table.sort(layer.objects, Object.__lt)
+		end
+		for _, object in pairs(layer.objects) do
+			if object.gid or object.properties.text then
+				table.insert(layer.spriteobjects, object)
+			end
+			object.layer = layer
+		end
+	end
 
+	layer.objects = layer.objects or {}
+	layer.offsetx = layer.offsetx or 0
+	layer.offsety = layer.offsety or 0
+end
+
+function Layer.__call(_, map, name, i)
+	local layer = map:addCustomLayer(name, i)
+	Layer.init(layer)
 	return layer
 end
 
-return newLayer
+return Layer
