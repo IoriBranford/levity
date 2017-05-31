@@ -1,6 +1,7 @@
-local Fonts = class(function(self)
+local Fonts = class()
+function Fonts:_init()
 	self.fonts = {}
-end)
+end
 
 function Fonts:load(fontfiles)
 	local function load(fontfile)

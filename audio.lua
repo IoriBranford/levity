@@ -1,15 +1,14 @@
 --- @module audio
 
-require "levity.class"
-
 local MusicEmu = require "levity.MusicEmu"
 
-local Bank = class(function(self)
+local Bank = class()
+function Bank:_init()
 	self.sounds = {}
 	self.currentmusic = nil
 	self.timetonextmusic = 0
 	self.nextmusicfile = nil
-end)
+end
 
 --- Load list of audio files
 -- @param sounds Table or comma-separated audio file list

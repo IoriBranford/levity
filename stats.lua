@@ -1,8 +1,7 @@
-require "levity.class"
-
-local Stats = class(function(self)
+local Stats = class()
+function Stats:_init()
 	self:reset()
-end)
+end
 
 function Stats:reset()
 	self.timer = 0

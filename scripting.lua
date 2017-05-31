@@ -1,7 +1,5 @@
 -- @module scripting
 
-require "levity.class"
-
 local LockMT = {}
 
 local function broadcast__newindex(t,k,v)
@@ -12,12 +10,13 @@ local function send__newindex(t,k,v)
 	error("Cannot add new script for current receiving id")
 end
 
-local Machine = class(function(self)
+local Machine = class()
+function Machine:_init()
 	self.eventscripts = {}
 	self.idscripts = {}
 	self.logs = {}
 	self.classes = {}
-end)
+end
 
 --- Get a script class, loading it if not loaded already
 -- @name of the class (not file name or path)

@@ -4,6 +4,7 @@ love.filesystem.setRequirePath(
 	love.filesystem.getRequirePath())
 
 require("pl.strict").module("_G", _G)
+class = require "pl.class"
 
 local audio = require "levity.audio"
 local text = require "levity.text"
@@ -15,7 +16,6 @@ local Map = require "levity.map"
 
 require "levity.xcoroutine"
 require "levity.xmath"
-require "levity.class"
 
 --- @table levity
 -- @field map
