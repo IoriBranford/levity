@@ -222,10 +222,14 @@ function Map.cleanupObjects(map, discardedobjects)
 		Object.setLayer(object, nil)
 
 		if object.body then
-			for _, fixture in pairs(object.body:getFixtureList()) do
-				fixture:setUserData(nil)
-			end
-			object.body:setUserData(nil)
+			-- Body:destroy sends endContact,
+			-- so user data might still be needed.
+			-- LOVE 0.10.3 will fix the leak.
+			-- https://bitbucket.org/rude/love/issues/1273
+			--for _, fixture in pairs(object.body:getFixtureList()) do
+			--	fixture:setUserData(nil)
+			--end
+			--object.body:setUserData(nil)
 			object.body:destroy()
 		end
 

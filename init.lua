@@ -115,20 +115,24 @@ function levity:loadNextMap()
 	self.mapfile = self.nextmapfile
 	self.nextmapfile = nil
 
-	if self.map and self.scripts then
-		self:cleanupObjects(self.map.objects)
-		sti:flush()
-	end
-
 	if self.world then
+		self.world:setCallbacks(nil, nil, nil, nil)
 		for _, body in pairs(self.world:getBodyList()) do
 			for _, fixture in pairs(body:getFixtureList()) do
 				fixture:setUserData(nil)
 			end
 			body:setUserData(nil)
+			body:destroy()
 		end
-		self.world:setCallbacks(nil, nil, nil, nil)
 		self.world:destroy()
+	end
+
+	if self.map then
+		for _, object in pairs(self.map.objects) do
+			object.body = nil
+		end
+		self:cleanupObjects(self.map.objects)
+		sti:flush()
 	end
 
 	scripting.unloadScripts()
