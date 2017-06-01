@@ -136,6 +136,7 @@ function levity:loadNextMap()
 	end
 
 	scripting.unloadScripts()
+	scripting.endScriptLoading()
 
 	self.bank = audio.newBank()
 	self.fonts = text.newFonts()
@@ -156,7 +157,10 @@ function levity:loadNextMap()
 	self.map:loadFonts(self.fonts)
 	self.map:loadSounds(self.bank)
 	self.scripts = scripting.newMachine()
+
 	initPhysics(self)
+
+	scripting.beginScriptLoading()
 	self.map:initScripts(self.scripts)
 
 	self.map:windowResized(love.graphics.getWidth(),

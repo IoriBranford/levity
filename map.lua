@@ -428,8 +428,6 @@ local function initTileset(tileset, tiles)
 end
 
 function Map.initScripts(map, scripts)
-	scripting.beginScriptLoading()
-
 	for i = 1, #map.layers do
 		local layer = map.layers[i]
 
@@ -463,8 +461,6 @@ function Map.initScripts(map, scripts)
 		end
 		scripts:send(map.name, "start")
 	end
-
-	scripting.endScriptLoading()
 end
 
 function Map.windowResized(map, w, h, camera)
