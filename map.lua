@@ -15,6 +15,8 @@ local Map = {
 }
 -- Still want STI Map functions, so do not use class or metatable.
 
+local TilesetMissingField = "Tileset %s has no %s named %s"
+
 function Map.getTileGid(map, tilesetid, row, column)
 	local tileset = map.tilesets[tilesetid]
 	if not tileset then
@@ -27,14 +29,25 @@ function Map.getTileGid(map, tilesetid, row, column)
 		tileid = row
 		if type(tileid) == "string" then
 			tileid = tileset.namedtiles[tileid]
+		elseif type(tileid) == "table" then
+			local rowstype = tileset.properties.rowstype or "row"
+			local colstype = tileset.properties.colstype or "column"
+			row = tileid[rowstype] or 0
+			column = tileid[colstype] or 0
 		end
-	elseif row then
+	end
+
+	if column and row then
 		if type(column) == "string" then
-			column = tileset.namedcols[column]
+			local c = tileset.namedcols[column]
+			assert(c, TilesetMissingField:format(tileset.name, "column", column))
+			column = c
 		end
 
 		if type(row) == "string" then
-			row = tileset.namedrows[row]
+			local r = tileset.namedrows[row]
+			assert(r, TilesetMissingField:format(tileset.name, "row", row))
+			row = r
 		end
 
 		tileid = row * tileset.tilecolumns + column
