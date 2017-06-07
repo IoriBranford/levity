@@ -31,8 +31,10 @@ local function addFixture(body, shape, object)
 	local collisionrules = levity.collisionrules
 	local category = object.properties.category
 	if category and collisionrules then
-		category = "Category_"..category
-		fixture:setCategory(levity.collisionrules[category])
+		if type(category) == "string" then
+			category = levity.collisionrules["Category_"..category]
+		end
+		fixture:setCategory(category)
 	end
 
 	return fixture
