@@ -619,9 +619,11 @@ local function newMap(mapfile)
 	map.paused = false
 
 	map.objecttypes = maputil.loadObjectTypesFile("objecttypes.xml")
+
 	if map.objecttypes then
-		maputil.setObjectsDefaultProperties(map.objects,
-							map.objecttypes)
+		maputil.setObjectTypesBases(map.objecttypes)
+		maputil.setObjectsDefaultProperties(map.objects, map.objecttypes)
+
 		local tiles = map.tiles
 		for i = 1, #tiles do
 			local tile = tiles[i]

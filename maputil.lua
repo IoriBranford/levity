@@ -55,11 +55,10 @@ function MapUtil.setObjectDefaultProperties(object, objecttypes)
 	local mt = {}
 	function mt.__index(properties, name)
 		local defaultproperties = objecttypes[object.type]
-		if not defaultproperties then
-			return nil
+		if defaultproperties then
+			return defaultproperties[name]
 		end
-
-		return defaultproperties[name]
+		return nil
 	end
 
 	setmetatable(object.properties, mt)
@@ -71,6 +70,33 @@ end
 function MapUtil.setObjectsDefaultProperties(objects, objecttypes)
 	for _, object in pairs(objects) do
 		MapUtil.setObjectDefaultProperties(object, objecttypes)
+	end
+end
+
+--- Set object type to fall back to another object type as its base
+--@param object
+--@param objecttypes returned from loadObjectTypesFile
+function MapUtil.setObjectTypeBase(objecttype, objecttypes)
+	local mt = {}
+	function mt.__index(objecttype, name)
+		local basetype = rawget(objecttype, "_basetype")
+		if basetype then
+			local baseproperties = objecttypes[basetype]
+			if baseproperties then
+				return baseproperties[name]
+			end
+		end
+		return nil
+	end
+
+	setmetatable(objecttype, mt)
+end
+
+--- Set multiple object types' bases
+--@param objecttypes returned from loadObjectTypesFile
+function MapUtil.setObjectTypesBases(objecttypes)
+	for _, objecttype in pairs(objecttypes) do
+		MapUtil.setObjectTypeBase(objecttype, objecttypes)
 	end
 end
 
