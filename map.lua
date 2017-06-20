@@ -134,8 +134,12 @@ end
 
 function Map.addBatchSprite(map, batch, gid, x, y, r, sx, sy, ox, oy, kx, ky)
 	local tile = map.tiles[gid]
+	local tileset = map.tilesets[tile.tileset]
 	local quad = tile.quad
-	return batch:add(quad, x, y, r, sx, sy, ox, oy, kx, ky)
+	return batch:add(quad, x, y, r, sx, sy,
+			(ox or 0) - tile.offset.x,
+			(oy or 0) - tile.offset.y + tileset.tileheight,
+			kx, ky)
 end
 
 function Map.setBatchSprite(map, batch, i, gid, x, y, r, sx, sy, ox, oy, kx, ky)
@@ -143,8 +147,12 @@ function Map.setBatchSprite(map, batch, i, gid, x, y, r, sx, sy, ox, oy, kx, ky)
 		batch:set(i, 0, 0, 0, 0, 0)
 	else
 		local tile = map.tiles[gid]
+		local tileset = map.tilesets[tile.tileset]
 		local quad = tile.quad
-		batch:set(i, quad, x, y, r, sx, sy, ox, oy, kx, ky)
+		batch:set(i, quad, x, y, r, sx, sy,
+			(ox or 0) - tile.offset.x,
+			(oy or 0) - tile.offset.y + tileset.tileheight,
+			kx, ky)
 	end
 end
 
