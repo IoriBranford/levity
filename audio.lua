@@ -38,7 +38,7 @@ function Bank:load(soundfiles, typ)
 			load(soundfile)
 		end
 	elseif type(soundfiles) == "string" then
-		for soundfile in (soundfiles..','):gmatch("(.-),%s-") do
+		for soundfile in (soundfiles..','):gmatch("%s*(.-)%s*,%s*") do
 			load(soundfile)
 		end
 	end
