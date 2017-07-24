@@ -588,8 +588,9 @@ function Map.loadFonts(map, fonts)
 		if objects then
 			for _, object in pairs(objects) do
 				local textfont = object.properties.textfont
+				local textfontsize = object.properties.textfontsize
 				if textfont then
-					fonts:load(textfont)
+					fonts:load(textfont, textfontsize)
 				end
 			end
 		end

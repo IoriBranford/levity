@@ -347,9 +347,10 @@ function Object.draw(object, map)
 	local text = object.properties.text
 	if text then
 		local textfont = object.properties.textfont
+		local textfontsize = object.properties.textfontsize
 		if textfont then
 			levity = levity or require "levity" --TEMP
-			levity.fonts:use(textfont)
+			levity.fonts:use(textfont, textfontsize)
 		end
 
 		local textalign = object.properties.textalign or "center"

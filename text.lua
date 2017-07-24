@@ -3,14 +3,14 @@ function Fonts:_init()
 	self.fonts = {}
 end
 
-function Fonts:load(fontfiles)
-	local function load(fontfile)
-		local font = self.fonts[fontfile]
+function Fonts:load(fontfiles, size)
+	local function load(fontfile, size)
+		local font = self.fonts[fontfile..size]
 		if not font then
 			if love.filesystem.exists(fontfile) then
-				font = love.graphics.newFont(fontfile)
+				font = love.graphics.newFont(fontfile, size)
 				font:setFilter("nearest", "nearest")
-				self.fonts[fontfile] = font
+				self.fonts[fontfile..size] = font
 			else
 				print("WARNING: Missing font file "..fontfile)
 			end
@@ -19,18 +19,17 @@ function Fonts:load(fontfiles)
 
 	if type(fontfiles) == "table" then
 		for _, fontfile in pairs(fontfiles) do
-			load(fontfile)
+			load(fontfile, size)
 		end
 	elseif type(fontfiles) == "string" then
-		for fontfile in (fontfiles..','):gmatch("(.-),%s-") do
-			load(fontfile)
+		for fontfile in (fontfiles..','):gmatch("%s*(.-)%s*,%s*") do
+			load(fontfile, size)
 		end
 	end
-
 end
 
-function Fonts:use(fontfile)
-	local font = self.fonts[fontfile]
+function Fonts:use(fontfile, size)
+	local font = self.fonts[fontfile..size]
 	if font then
 		love.graphics.setFont(font)
 	end
