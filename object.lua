@@ -354,9 +354,24 @@ function Object.draw(object, map)
 		end
 
 		local textalign = object.properties.textalign or "center"
+		local textcolor = object.properties.textcolor
+		local r0,g0,b0,a0
+		if textcolor then
+			r0,g0,b0,a0 = love.graphics.getColor()
+			local a,r,g,b = textcolor:match("#(%x%x)(%x%x)(%x%x)(%x%x)")
+			love.graphics.setColor(
+						tonumber("0x"..r),
+						tonumber("0x"..g),
+						tonumber("0x"..b),
+						tonumber("0x"..a))
+		end
 
 		love.graphics.printf(text, left, top, right - left,
 					textalign)--, object.rotation)
+
+		if textcolor then
+			love.graphics.setColor(r0, g0, b0, a0)
+		end
 	end
 end
 
