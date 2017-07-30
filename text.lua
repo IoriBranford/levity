@@ -3,14 +3,22 @@ function Fonts:_init()
 	self.fonts = {}
 end
 
+local function getFontName(file, size)
+	if size then
+		file = file..size
+	end
+	return file
+end
+
 function Fonts:load(fontfiles, size)
 	local function load(fontfile, size)
-		local font = self.fonts[fontfile..size]
+		local fontname = getFontName(fontfile, size)
+		local font = self.fonts[fontname]
 		if not font then
 			if love.filesystem.exists(fontfile) then
 				font = love.graphics.newFont(fontfile, size)
 				font:setFilter("nearest", "nearest")
-				self.fonts[fontfile..size] = font
+				self.fonts[fontname] = font
 			else
 				print("WARNING: Missing font file "..fontfile)
 			end
@@ -29,7 +37,8 @@ function Fonts:load(fontfiles, size)
 end
 
 function Fonts:use(fontfile, size)
-	local font = self.fonts[fontfile..size]
+	local fontname = getFontName(fontfile, size)
+	local font = self.fonts[fontname]
 	if font then
 		love.graphics.setFont(font)
 	end
