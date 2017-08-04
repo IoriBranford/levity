@@ -32,6 +32,7 @@ require "levity.xmath"
 -- @field movetimer Time left until next move
 -- @field movedt Time between each move
 -- @field drawbodies
+-- @field drawstats
 -- @field nextmapfile Will load and switch to this map on the next frame
 -- @field nextmapdata
 
@@ -246,7 +247,9 @@ function levity:draw()
 
 	self.map:draw(self.camera, self.scripts, self.drawbodies and self.world)
 
-	self.stats:draw()
+	if self.drawstats then
+		self.stats:draw()
+	end
 end
 
 function levity:screenToCamera(x, y)
