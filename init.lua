@@ -83,6 +83,19 @@ local function initPhysics(self)
 	self.world:setCallbacks(beginContact, endContact, preSolve, postSolve)
 
 	self.map:box2d_init(self.world)
+
+	for _, fixture in pairs(self.map.box2d_collision.body:getFixtureList()) do
+		local fixturedata = fixture:getUserData()
+		local fixtureproperties = fixturedata.properties
+		local category = fixtureproperties.category
+
+		if category then
+			if type(category) == "string" then
+				category = self.collisionrules["Category_"..category]
+			end
+			fixture:setCategory(category)
+		end
+	end
 end
 
 local function camera_set(camera, cx, cy, w, h)
