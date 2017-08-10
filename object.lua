@@ -57,10 +57,7 @@ function Object.init(object, layer, map)
 		object.id = map:newObjectId()
 	end
 
-	local bodytype
-	if not object.properties.static then
-		bodytype = "dynamic"
-	end
+	local bodytype = object.properties.static and "static" or "dynamic"
 
 	Object.setLayer(object, layer)
 
@@ -100,15 +97,15 @@ function Object.init(object, layer, map)
 					object.y + halfw*sin + halfh*cos
 				shape = love.physics.newCircleShape(0, 0,
 					(object.width + object.height) * .25)
-			elseif object.shape == "polyline" then
+			elseif object.shape == "polyline" or object.shape == "polygon" then
 				local points = {}
-				for _, point in ipairs(object.polyline) do
+				local poly = object.polygon or object.polyline
+				for _, point in ipairs(poly) do
 					-- sti converts them to world points
 					table.insert(points, point.x - object.x)
 					table.insert(points, point.y - object.y)
 				end
-				shape = love.physics.newChainShape(
-					object.properties.loop or false, points)
+				shape = love.physics.newChainShape(object.polygon, points)
 			end
 
 			if shape then
