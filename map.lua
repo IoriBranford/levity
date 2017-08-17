@@ -475,12 +475,12 @@ function Map.initScripts(map, scripts)
 
 	if not map.properties.delayinitobjects then
 		for _, object in pairs(map.objects) do
-			scripts:send(object.id, "start")
+			scripts:send(object.id, "initQuery")
 		end
 		for i = 1, #map.layers do
-			scripts:send(map.layers[i].name, "start")
+			scripts:send(map.layers[i].name, "initQuery")
 		end
-		scripts:send(map.name, "start")
+		scripts:send(map.name, "initQuery")
 	end
 end
 

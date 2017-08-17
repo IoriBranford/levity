@@ -30,7 +30,7 @@ function Layer.update(layer, dt, map, scripts)
 			Object.init(newobjects[i], layer, map)
 		end
 		for i = i0, i1 do
-			scripts:send(newobjects[i].id, "start")
+			scripts:send(newobjects[i].id, "initQuery")
 		end
 
 		i0 = i1 + 1
