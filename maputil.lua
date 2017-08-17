@@ -78,15 +78,10 @@ end
 --@param objecttypes returned from loadObjectTypesFile
 function MapUtil.setObjectTypeBase(objecttype, objecttypes)
 	local mt = {}
-	function mt.__index(objecttype, name)
+	function mt.__index(objecttype, property)
 		local basetype = rawget(objecttype, "_basetype")
-		if basetype then
-			local baseproperties = objecttypes[basetype]
-			if baseproperties then
-				return baseproperties[name]
-			end
-		end
-		return nil
+		basetype = basetype and objecttypes[basetype]
+		return basetype and basetype[property]
 	end
 
 	setmetatable(objecttype, mt)
