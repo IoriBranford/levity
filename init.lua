@@ -258,6 +258,14 @@ function levity:screenToCamera(x, y)
 		(y - love.graphics.getHeight()*.5)/scale + self.camera.h*.5
 end
 
+function levity:timerCorrectRoundingError(timer, time)
+	local diff = math.abs(timer - time)
+	if diff < self.movedt*.5 then
+		timer = time
+	end
+	return timer
+end
+
 local NoFirstMapMessage =
 "First map not set. In main.lua call levity:setNextMap to set the first map"
 
