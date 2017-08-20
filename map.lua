@@ -633,6 +633,15 @@ local function newMap(mapfile)
 		maputil.setObjectTypesBases(map.objecttypes)
 		maputil.setObjectsDefaultProperties(map.objects, map.objecttypes)
 
+		for t, properties in pairs(map.objecttypes) do
+			for k, v in pairs(properties) do
+				if k:sub(-2) == "id"
+				and (v == 0 or v == "") then
+					properties[k] = nil
+				end
+			end
+		end
+
 		local tiles = map.tiles
 		for i = 1, #tiles do
 			local tile = tiles[i]
