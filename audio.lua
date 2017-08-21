@@ -49,7 +49,7 @@ end
 --- Play an audio file
 -- @param soundfile
 -- @return Sound source now playing the audio
-function Bank:play(soundfile, track)
+function Bank:play(soundfile, track, newsource)
 	local sound = self.sounds[soundfile]
 	local source = nil
 	if sound then
@@ -58,16 +58,16 @@ function Bank:play(soundfile, track)
 			sound:start(track)
 			source = sound
 			self.currentmusic = source
-		elseif typ == "stream" then
+		elseif typ == "static" and newsource then
+			source = sound:clone()
+			source:play()
+		else
 			if sound:isPlaying() then
 				sound:rewind()
 			else
 				sound:play()
 			end
 			source = sound
-		else
-			source = sound:clone()
-			source:play()
 		end
 	end
 	return source
