@@ -14,6 +14,7 @@ end
 -- @param sounds Table or comma-separated audio file list
 -- @param type "static" for sfx or "stream" for music/ambience (default "stream")
 function Bank:load(soundfiles, typ)
+	typ = typ or "static"
 	local function load(soundfile)
 		local sound = self.sounds[soundfile]
 		if not sound or sound:getType() ~= typ then
