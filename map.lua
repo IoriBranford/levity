@@ -631,7 +631,13 @@ local function newMap(mapfile)
 
 	if map.objecttypes then
 		maputil.setObjectTypesBases(map.objecttypes)
-		maputil.setObjectsDefaultProperties(map.objects, map.objecttypes)
+
+		for _, layer in ipairs(map.layers) do
+			if layer.objects then
+				maputil.setObjectsDefaultProperties(
+					layer.objects, map.objecttypes)
+			end
+		end
 
 		for t, properties in pairs(map.objecttypes) do
 			for k, v in pairs(properties) do
