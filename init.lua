@@ -271,8 +271,10 @@ local NoFirstMapMessage =
 
 local Usage = {
 	Desc =	"Levity 2D game engine\n",
+	Version="  --version				Print LOVE version\n",
+	Fused =	"  --fused				Force running in fused mode\n",
 	Game =	"  <game> (string)			Game location\n",
-	Debug =	"  -debug				Debugging in Zerobrane Studio\n",
+	Debug =	"  -debug				Debug in Zerobrane Studio\n",
 	Map =	"  <map>	 (string default %s)	Map file to start\n"
 }
 
@@ -282,7 +284,7 @@ function love.load()
 
 	assert(levity.nextmapfile, NoFirstMapMessage)
 
-	local options = Usage.Desc
+	local options = Usage.Desc..Usage.Version..Usage.Fused
 	if not love.filesystem.isFused() then
 		options = options .. Usage.Game
 	end
@@ -297,6 +299,13 @@ function love.load()
 	end
 
 	if args.map then
+		-- When fused we expect <map>,
+		-- but if fused mode is fake we get <game> and <map>
+		-- Also handles invalid <map> by falling back to default
+		if not love.filesystem.exists(args.map) then
+			args.map = args[1] or levity.nextmapfile
+		end
+
 		levity:setNextMap(args.map)
 	end
 
