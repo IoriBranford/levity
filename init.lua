@@ -342,6 +342,10 @@ function love.joystickaxis(joystick, axis, value)
 	levity.scripts:broadcast("joystickaxis", joystick, axis, value)
 end
 
+function love.joystickhat(joystick, hat, value)
+	levity.scripts:broadcast("joystickhat", joystick, hat, value)
+end
+
 function love.joystickpressed(joystick, button)
 	levity.scripts:broadcast("joystickpressed", joystick, button)
 end
