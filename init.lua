@@ -10,7 +10,7 @@ local audio = require "levity.audio"
 local text = require "levity.text"
 local stats = require "levity.stats"
 local scripting = require "levity.scripting"
-local sti = require "sti.sti"
+local sti = require "levity.sti.sti"
 
 local Map = require "levity.map"
 

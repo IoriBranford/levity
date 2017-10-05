@@ -1,6 +1,6 @@
 local scripting = require "levity.scripting"
 local maputil = require "levity.maputil"
-local sti = require "sti.sti"
+local sti = require "levity.sti.sti"
 local Layer = require "levity.layer"
 local Object = require "levity.object"
 local Tiles = require "levity.tiles"

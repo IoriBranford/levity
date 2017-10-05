@@ -1,3 +1,6 @@
 [submodule "pl"]
 	path = pl
 	url = https://github.com/stevedonovan/Penlight.git
+[submodule "sti"]
+	path = sti
+	url = https://github.com/IoriBranford/Simple-Tiled-Implementation.git
