@@ -354,7 +354,7 @@ function Map.draw(map, camera, scripts, world)
 		love.graphics.draw(map.canvas,
 					love.graphics.getWidth()*.5,
 					love.graphics.getHeight()*.5,
-					0, canvasscale, canvasscale,
+					camera.r, canvasscale, canvasscale,
 					map.canvas:getWidth()*.5,
 					map.canvas:getHeight()*.5)
 	end
@@ -485,11 +485,10 @@ function Map.initScripts(map, scripts)
 end
 
 function Map.windowResized(map, w, h, camera)
-	local scale = math.min(w/camera.w, h/camera.h)
-	local intscale = math.min(math.floor(scale), CanvasMaxScale)
+	camera:updateScale()
+	local intscale = math.min(math.floor(camera.scale), CanvasMaxScale)
 	map:resize(camera.w * intscale, camera.h * intscale)
 	map.canvas:setFilter("linear", "linear")
-	camera.scale = scale
 end
 
 local function incIdProperties(properties, incid)
@@ -666,6 +665,13 @@ local function newMap(mapfile)
 		map.tilesets[tileset.name] = tileset
 		initTileset(tileset, map.tiles)
 	end
+
+	setmetatable(map.tiles, {
+		__index = function(tiles, gid)
+			error("There is no tile with gid "..gid
+				.." (out of "..#tiles.." tiles)")
+		end
+	})
 
 	for _, layer in ipairs(map.layers) do
 		if layer.type == "dynamiclayer" then

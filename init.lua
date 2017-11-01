@@ -107,12 +107,23 @@ local function camera_set(camera, cx, cy, w, h)
 		camera.h = h
 	end
 	if w or h then
-		local gw = love.graphics.getWidth()
-		local gh = love.graphics.getHeight()
-		camera.scale = math.min(gw/camera.w, gh/camera.h)
+		camera:updateScale()
 	end
 	camera.x = (cx - camera.w * .5)
 	camera.y = (cy - camera.h * .5)
+end
+
+local function camera_rotate(camera, r)
+	camera.r = camera.r + r
+	camera:updateScale()
+end
+
+local function camera_updateScale(camera)
+	local cosr = math.abs(math.cos(camera.r))
+	local sinr = math.abs(math.sin(camera.r))
+	local sw = love.graphics.getWidth()*cosr + love.graphics.getHeight()*sinr
+	local sh = love.graphics.getHeight()*cosr + love.graphics.getWidth()*sinr
+	camera.scale = math.min(sw/camera.w, sh/camera.h)
 end
 
 local function camera_zoom(camera, vz)
@@ -161,8 +172,11 @@ function levity:loadNextMap()
 		x = 0, y = 0,
 		w = love.graphics.getWidth(), h = love.graphics.getHeight(),
 		scale = 1,
+		r = 0,
 		set = camera_set,
-		zoom = camera_zoom
+		zoom = camera_zoom,
+		updateScale = camera_updateScale,
+		rotate = camera_rotate
 	}
 
 	collectgarbage()
