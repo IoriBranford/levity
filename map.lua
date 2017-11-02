@@ -1,3 +1,4 @@
+local prefs = require "levity.prefs"
 local scripting = require "levity.scripting"
 local maputil = require "levity.maputil"
 local sti = require "levity.sti.sti"
@@ -354,7 +355,8 @@ function Map.draw(map, camera, scripts, world)
 		love.graphics.draw(map.canvas,
 					love.graphics.getWidth()*.5,
 					love.graphics.getHeight()*.5,
-					camera.r, canvasscale, canvasscale,
+					prefs.rotation,
+					canvasscale, canvasscale,
 					map.canvas:getWidth()*.5,
 					map.canvas:getHeight()*.5)
 	end

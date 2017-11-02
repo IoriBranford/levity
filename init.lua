@@ -17,7 +17,7 @@ local Map = require "levity.map"
 require "levity.xcoroutine"
 require "levity.xmath"
 
---- @table levity
+---
 -- @field map
 -- @field camera
 -- @field scripts
@@ -26,17 +26,19 @@ require "levity.xmath"
 -- @field discardedobjects
 -- @field bank
 -- @field fonts
+-- @field prefs
 -- @field stats
 -- @field timescale
 -- @field maxdt
 -- @field movetimer Time left until next move
 -- @field movedt Time between each move
--- @field drawbodies
--- @field drawstats
 -- @field nextmapfile Will load and switch to this map on the next frame
 -- @field nextmapdata
+-- @table levity
 
-local levity = {}
+local levity = {
+	prefs = require "levity.prefs"
+}
 
 function levity:setNextMap(nextmapfile, nextmapdata)
 	self.nextmapfile = nextmapfile
@@ -113,16 +115,14 @@ local function camera_set(camera, cx, cy, w, h)
 	camera.y = (cy - camera.h * .5)
 end
 
-local function camera_rotate(camera, r)
-	camera.r = camera.r + r
-	camera:updateScale()
-end
-
 local function camera_updateScale(camera)
-	local cosr = math.abs(math.cos(camera.r))
-	local sinr = math.abs(math.sin(camera.r))
-	local sw = love.graphics.getWidth()*cosr + love.graphics.getHeight()*sinr
-	local sh = love.graphics.getHeight()*cosr + love.graphics.getWidth()*sinr
+	local r = levity.prefs.rotation
+	local cosr = math.abs(math.cos(r))
+	local sinr = math.abs(math.sin(r))
+	local gw = love.graphics.getWidth()
+	local gh = love.graphics.getHeight()
+	local sw = gw*cosr + gh*sinr
+	local sh = gh*cosr + gw*sinr
 	camera.scale = math.min(sw/camera.w, sh/camera.h)
 end
 
@@ -176,7 +176,6 @@ function levity:loadNextMap()
 		set = camera_set,
 		zoom = camera_zoom,
 		updateScale = camera_updateScale,
-		rotate = camera_rotate
 	}
 
 	collectgarbage()
@@ -233,7 +232,9 @@ function levity:update(dt)
 
 	collectgarbage("step", 1)
 
-	self.stats:update(dt)
+	if self.prefs.stats then
+		self.stats:update(dt)
+	end
 
 	self.movetimer = self.movetimer - dt
 end
@@ -259,9 +260,10 @@ function levity:draw()
 		return
 	end
 
-	self.map:draw(self.camera, self.scripts, self.drawbodies and self.world)
+	self.map:draw(self.camera, self.scripts,
+		self.prefs.drawbodies and self.world)
 
-	if self.drawstats then
+	if self.prefs.drawstats then
 		self.stats:draw()
 	end
 end
@@ -322,6 +324,8 @@ function love.load()
 
 		levity:setNextMap(args.map)
 	end
+
+	levity.prefs.init()
 
 	love.graphics.setNewFont(18)
 	love.physics.setMeter(64)
