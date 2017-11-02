@@ -232,7 +232,7 @@ function levity:update(dt)
 
 	collectgarbage("step", 1)
 
-	if self.prefs.stats then
+	if self.prefs.drawstats then
 		self.stats:update(dt)
 	end
 
@@ -289,9 +289,14 @@ local Usage = {
 	Desc =	"Levity 2D game engine\n",
 	Version="  --version				Print LOVE version\n",
 	Fused =	"  --fused				Force running in fused mode\n",
-	Game =	"  <game> (string)			Game location\n",
+	Game =	"  <game>	(string)		Game assets location\n",
 	Debug =	"  -debug				Debug in Zerobrane Studio\n",
-	Map =	"  <map>	 (string default %s)	Map file to start\n"
+	Prefs = [[
+  --rotation	(number default 0)	Screen orientation in degrees clockwise
+  --drawstats				Draw performance stats
+  --drawbodies				Draw physical bodies
+]],
+	Map =	"  <map>	(string default %s)	Map file to start\n"
 }
 
 function love.load()
@@ -304,7 +309,7 @@ function love.load()
 	if not love.filesystem.isFused() then
 		options = options .. Usage.Game
 	end
-	options = options .. Usage.Debug
+	options = options .. Usage.Debug..Usage.Prefs
 	options = options .. string.format(Usage.Map, levity.nextmapfile)
 
 	local args = lapp (options)
@@ -325,7 +330,11 @@ function love.load()
 		levity:setNextMap(args.map)
 	end
 
-	levity.prefs.init()
+	local prefs = levity.prefs
+	prefs.init()
+	prefs.rotation = math.rad(args.rotation)
+	prefs.drawbodies = args.drawbodies
+	prefs.drawstats = args.drawstats
 
 	love.graphics.setNewFont(18)
 	love.physics.setMeter(64)
