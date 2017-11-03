@@ -334,6 +334,8 @@ function Map.draw(map, camera, scripts, world)
 				return true
 			end)
 
+		love.graphics.scale(intscale, intscale)
+
 		for _, fixture in ipairs(VisibleFixtures) do
 			local body = fixture:getBody()
 			love.graphics.circle("line", body:getX(), body:getY(),
