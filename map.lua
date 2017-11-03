@@ -278,12 +278,13 @@ function Map.draw(map, camera, scripts, world)
 	local ccx, ccy = cx+cw*.5, cy+ch*.5
 
 	local scale = camera.scale
-	local intscale = math.min(math.floor(scale), CanvasMaxScale)
+	local intscale = math.floor(scale)
 
 	love.graphics.push()
+	--love.graphics.scale(intscale, intscale)
+	--love.graphics.translate(-cx, -cy)
 	love.graphics.translate(-math.floor(cx * intscale),
 				-math.floor(cy * intscale))
-	love.graphics.scale(intscale, intscale)
 
 	if scripts then
 		scripts:send(map.name, "beginDraw")
@@ -293,12 +294,30 @@ function Map.draw(map, camera, scripts, world)
 			if scripts then
 				scripts:send(layer.name, "beginDraw")
 			end
+
+			love.graphics.push()
+			love.graphics.translate(
+				math.floor(layer.offsetx*intscale),
+				math.floor(layer.offsety*intscale))
+			love.graphics.scale(intscale, intscale)
+
 			local r,g,b,a = love.graphics.getColor()
 			love.graphics.setColor(r, g, b, a * layer.opacity)
 
+			if scripts then
+				scripts:send(layer.name, "drawUnder")
+			end
+
 			layer:draw(map, camera, scripts)
 
+			if scripts then
+				scripts:send(layer.name, "drawOver")
+			end
+
 			love.graphics.setColor(r,g,b,a)
+
+			love.graphics.pop()
+
 			if scripts then
 				scripts:send(layer.name, "endDraw")
 			end
@@ -488,7 +507,7 @@ end
 
 function Map.windowResized(map, w, h, camera)
 	camera:updateScale()
-	local intscale = math.min(math.floor(camera.scale), CanvasMaxScale)
+	local intscale = math.floor(camera.scale)
 	map:resize(camera.w * intscale, camera.h * intscale)
 	map.canvas:setFilter("linear", "linear")
 end
@@ -682,6 +701,8 @@ local function newMap(mapfile)
 			for _, object in pairs(layer.objects) do
 				map.objects[object.id] = object
 			end
+		elseif layer.type == "tilelayer" then
+			layer.draw = Layer.drawBatches
 		end
 	end
 

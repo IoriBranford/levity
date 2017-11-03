@@ -62,9 +62,9 @@ function Layer.update(layer, dt, map, scripts)
 end
 
 function Layer.draw(layer, map, camera, scripts)
-	love.graphics.push()
-	love.graphics.translate(layer.offsetx, layer.offsety)
-	for _, object in ipairs(layer.spriteobjects) do
+	local spriteobjects = layer.spriteobjects
+	for i = 1, #spriteobjects do
+		local object = spriteobjects[i]
 		if object.visible and Object.isOnCamera(object, camera) then
 			if scripts then
 				scripts:send(object.id, "beginDraw")
@@ -75,7 +75,12 @@ function Layer.draw(layer, map, camera, scripts)
 			end
 		end
 	end
-	love.graphics.pop()
+end
+
+function Layer.drawBatches(layer, map, camera)
+	for _, batch in pairs(layer.batches) do
+		love.graphics.draw(batch)
+	end
 end
 
 function Layer.init(layer)
