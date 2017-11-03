@@ -705,6 +705,8 @@ local function newMap(mapfile)
 			end
 		elseif layer.type == "tilelayer" then
 			layer.draw = Layer.drawBatches
+		elseif layer.type == "imagelayer" then
+			layer.draw = Layer.drawImage
 		end
 	end
 

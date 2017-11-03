@@ -77,6 +77,12 @@ function Layer.draw(layer, map, camera, scripts)
 	end
 end
 
+function Layer.drawImage(layer, map, camera)
+	if layer.image then
+		love.graphics.draw(layer.image)
+	end
+end
+
 function Layer.drawBatches(layer, map, camera)
 	for _, batch in pairs(layer.batches) do
 		love.graphics.draw(batch)
