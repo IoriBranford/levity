@@ -266,6 +266,14 @@ function levity:draw()
 	if self.prefs.drawstats then
 		self.stats:draw()
 	end
+
+	if self.version then
+		local font = love.graphics.getFont()
+		local gw = love.graphics.getWidth()
+		local gh = love.graphics.getHeight()
+		local y = gh - font:getHeight()
+		love.graphics.printf(self.version, 0, y, gw, "right")
+	end
 end
 
 function levity:screenToCamera(x, y)
@@ -300,6 +308,9 @@ local Usage = {
 }
 
 function love.load()
+	local version, err = love.filesystem.read("version")
+	levity.version = version and ("ver "..version)
+
 	local lapp = require "pl.lapp"
 	lapp.slack = true
 
