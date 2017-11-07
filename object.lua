@@ -233,7 +233,7 @@ function Object.setLayer(object, layer)
 	if oldlayer then
 		removeObject(oldlayer.objects, object)
 		if oldlayer.spriteobjects then
-			if object.gid or object.properties.text then
+			if object.gid or object.text or object.properties.text then
 				removeObject(oldlayer.spriteobjects, object)
 			end
 		end
@@ -241,7 +241,7 @@ function Object.setLayer(object, layer)
 
 	if layer then
 		table.insert(layer.objects, object)
-		if object.gid or object.properties.text then
+		if object.gid or object.text or object.properties.text then
 			table.insert(layer.spriteobjects, object)
 		end
 	end
@@ -341,29 +341,43 @@ function Object.draw(object, map)
 		end
 	end
 
-	local text = object.properties.text
+	local text = object.text or object.properties.text
 	if text then
 		local textfont = object.properties.textfont
 		local textfontsize = object.properties.textfontsize
 		if textfont then
 			levity = levity or require "levity" --TEMP
-			levity.fonts:use(textfont, textfontsize)
+			textfont = levity.fonts:use(textfont, textfontsize)
 		end
 
-		local textalign = object.properties.textalign or "center"
-		local textcolor = object.properties.textcolor
+		local textalign = object.halign
+			or object.properties.textalign or "left"
+		local textcolor = object.color or object.properties.textcolor
 		local r0,g0,b0,a0
 		if textcolor then
 			r0,g0,b0,a0 = love.graphics.getColor()
-			local a,r,g,b = textcolor:match("#(%x%x)(%x%x)(%x%x)(%x%x)")
-			love.graphics.setColor(
-						tonumber("0x"..r),
-						tonumber("0x"..g),
-						tonumber("0x"..b),
-						tonumber("0x"..a))
+			local a,r,g,b = 255, 255, 255, 255
+			if type(textcolor) == "string" then
+				a,r,g,b = textcolor:match("#(%x%x)(%x%x)(%x%x)(%x%x)")
+				r = tonumber("0x"..r)
+				g = tonumber("0x"..g)
+				b = tonumber("0x"..b)
+				a = tonumber("0x"..a)
+			elseif type(textcolor) == "table" then
+				r, g, b = textcolor[1], textcolor[2], textcolor[3]
+			end
+			love.graphics.setColor(r, g, b, a)
 		end
 
-		love.graphics.printf(text, left, top, right - left,
+		local offsety = 0
+		local valign = object.valign
+		if valign then
+			offsety = object.height - textfont:getHeight()
+			if valign == "center" then
+				offsety = offsety / 2
+			end
+		end
+		love.graphics.printf(text, left, top + offsety, right - left,
 					textalign)--, object.rotation)
 
 		if textcolor then

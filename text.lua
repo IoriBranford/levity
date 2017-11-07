@@ -42,6 +42,7 @@ function Fonts:use(fontfile, size)
 	if font then
 		love.graphics.setFont(font)
 	end
+	return font
 end
 
 local text = {
