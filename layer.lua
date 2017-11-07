@@ -111,7 +111,7 @@ function Layer.init(layer)
 			table.sort(layer.objects, Object.__lt)
 		end
 		for _, object in pairs(layer.objects) do
-			if object.gid or object.text or object.properties.text then
+			if object.gid or object.text then
 				table.insert(layer.spriteobjects, object)
 			end
 			object.layer = layer

@@ -233,7 +233,7 @@ function Object.setLayer(object, layer)
 	if oldlayer then
 		removeObject(oldlayer.objects, object)
 		if oldlayer.spriteobjects then
-			if object.gid or object.text or object.properties.text then
+			if object.gid or object.text then
 				removeObject(oldlayer.spriteobjects, object)
 			end
 		end
@@ -241,7 +241,7 @@ function Object.setLayer(object, layer)
 
 	if layer then
 		table.insert(layer.objects, object)
-		if object.gid or object.text or object.properties.text then
+		if object.gid or object.text then
 			table.insert(layer.spriteobjects, object)
 		end
 	end
@@ -341,7 +341,7 @@ function Object.draw(object, map)
 		end
 	end
 
-	local text = object.text or object.properties.text
+	local text = object.text
 	if text then
 		local textfont = object.properties.textfont
 		local textfontsize = object.properties.textfontsize
@@ -350,8 +350,7 @@ function Object.draw(object, map)
 			textfont = levity.fonts:use(textfont, textfontsize)
 		end
 
-		local textalign = object.halign
-			or object.properties.textalign or "left"
+		local textalign = object.halign or "left"
 		local textcolor = object.color or object.properties.textcolor
 		local r0,g0,b0,a0
 		if textcolor then
