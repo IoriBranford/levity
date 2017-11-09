@@ -266,7 +266,7 @@ local Usage = {
 
 function love.load()
 	if profile then
-		profile.hookall("Lua")
+		profile.hookall()
 		profile.start()
 	end
 
