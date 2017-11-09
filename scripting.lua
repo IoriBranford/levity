@@ -3,11 +3,13 @@
 local LockMT = {}
 
 local function broadcast__newindex(t,k,v)
-	error("Cannot add new script that receives current broadcasting event")
+	error("Cannot add new script that receives current broadcasting event\n"..
+		require("pl.pretty").write(v))
 end
 
 local function send__newindex(t,k,v)
-	error("Cannot add new script for current receiving id")
+	error("Cannot add new script for current receiving id\n"..
+		require("pl.pretty").write(v))
 end
 
 local Machine = class()
@@ -138,8 +140,9 @@ function Machine:call(id, event, ...)
 
 	LockMT.__newindex = send__newindex
 	setmetatable(idscripts, LockMT)
+	local logs = self.logs
 	for _, script in pairs(idscripts) do
-		local log = self.logs[script]
+		local log = logs[script]
 		if log then
 			log[#log + 1] = { id, event, ... }
 		end
@@ -163,8 +166,9 @@ function Machine:send(id, event, ...)
 
 	LockMT.__newindex = send__newindex
 	setmetatable(idscripts, LockMT)
+	local logs = self.logs
 	for _, script in pairs(idscripts) do
-		local log = self.logs[script]
+		local log = logs[script]
 		if log then
 			log[#log + 1] = { id, event, ... }
 		end
@@ -187,8 +191,9 @@ function Machine:broadcast(event, ...)
 
 	LockMT.__newindex = broadcast__newindex
 	setmetatable(scripts, LockMT)
+	local logs = self.logs
 	for _, script in pairs(scripts) do
-		local log = self.logs[script]
+		local log = logs[script]
 		if log then
 			log[#log + 1] = { event, ... }
 		end

@@ -1,10 +1,50 @@
+local pairs = pairs
+local ipairs = ipairs
+local tonumber = tonumber
+
+local math_floor = math.floor
+local math_pi = math.pi
+local string_sub = string.sub
+local string_find = string.find
+
+local love_math_decompress = love.math.decompress
+local love_graphics_setCanvas = love.graphics.setCanvas
+local love_graphics_clear = love.graphics.clear
+local love_graphics_push = love.graphics.push
+local love_graphics_pop = love.graphics.pop
+local love_graphics_translate = love.graphics.translate
+local love_graphics_scale = love.graphics.scale
+local love_graphics_setColor = love.graphics.setColor
+local love_graphics_getColor = love.graphics.getColor
+local love_graphics_getWidth = love.graphics.getWidth
+local love_graphics_getHeight = love.graphics.getHeight
+local love_graphics_draw = love.graphics.draw
+local love_graphics_points = love.graphics.points
+local love_graphics_line = love.graphics.line
+local love_graphics_circle = love.graphics.circle
+local love_graphics_polygon = love.graphics.polygon
+local love_graphics_newSpriteBatch = love.graphics.newSpriteBatch
+local love_graphics_newParticleSystem = love.graphics.newParticleSystem
+
 local prefs = require "levity.prefs"
 local scripting = require "levity.scripting"
+local Scripts_send = scripting.newMachine.send
+
 local maputil = require "levity.maputil"
+local maputil_setObjectsDefaultProperties = maputil.setObjectsDefaultProperties
+
 local sti = require "levity.sti.sti"
 local Layer = require "levity.layer"
+local Layer_init = Layer.init
+local Layer_update = Layer.update
+
 local Object = require "levity.object"
+local Object_init = Object.init
+local Object_setLayer = Object.setLayer
+
 local Tiles = require "levity.tiles"
+local Tiles_getGidFlip = Tiles.getGidFlip
+local Tiles_getUnflippedGid = Tiles.getUnflippedGid
 
 local CanvasMaxScale = 4
 
@@ -14,6 +54,7 @@ local CanvasMaxScale = 4
 
 local Map = {
 }
+Map.__index = Map
 -- Still want STI Map functions, so do not use class or metatable.
 
 local TilesetMissingField = "Tileset %s has no %s named %s"
@@ -41,13 +82,17 @@ function Map.getTileGid(map, tilesetid, row, column)
 	if column and row then
 		if type(column) == "string" then
 			local c = tileset.namedcols[column]
-			assert(c, TilesetMissingField:format(tileset.name, "column", column))
+			if not c then
+				error(TilesetMissingField:format(tileset.name, "column", column))
+			end
 			column = c
 		end
 
 		if type(row) == "string" then
 			local r = tileset.namedrows[row]
-			assert(r, TilesetMissingField:format(tileset.name, "row", row))
+			if not r then
+				error(TilesetMissingField:format(tileset.name, "row", row))
+			end
 			row = r
 		end
 
@@ -58,15 +103,15 @@ function Map.getTileGid(map, tilesetid, row, column)
 end
 
 function Map.getTileRowName(map, gid)
-	gid = Tiles.getUnflippedGid(gid)
+	gid = Tiles_getUnflippedGid(gid)
 	local tileset = map.tilesets[map.tiles[gid].tileset]
 	local tileid = gid - tileset.firstgid
 	local row = tileid / tileset.tilecolumns
-	return tileset.rownames[row] or math.floor(row)
+	return tileset.rownames[row] or math_floor(row)
 end
 
 function Map.getTileColumnName(map, gid)
-	gid = Tiles.getUnflippedGid(gid)
+	gid = Tiles_getUnflippedGid(gid)
 	local tileset = map.tilesets[map.tiles[gid].tileset]
 	local tileid = gid - tileset.firstgid
 	local column = tileid % tileset.tilecolumns
@@ -129,7 +174,7 @@ function Map.newSpriteBatch(map, tileset, size, usage)
 	local tileset = map.tilesets[tileset]
 	local image = tileset.image
 
-	local spritebatch = love.graphics.newSpriteBatch(image, size, usage)
+	local spritebatch = love_graphics_newSpriteBatch(image, size, usage)
 	return spritebatch
 end
 
@@ -165,11 +210,11 @@ function Map.newParticleSystem(map, gid, buffersize)
 	local tileset = map.tilesets[tilesetid]
 	local image = tileset.image
 
-	local particles = love.graphics.newParticleSystem(image, buffersize)
+	local particles = love_graphics_newParticleSystem(image, buffersize)
 
 	particles:setParticleLifetime(1)
 	particles:setEmissionRate(0)
-	particles:setSpread(2*math.pi)
+	particles:setSpread(2*math_pi)
 	particles:setSpeed(60)
 	map:setParticlesGid(particles, gid)
 	return particles
@@ -240,8 +285,9 @@ function Map.newObjectId(map)
 end
 
 function Map.cleanupObjects(map, discardedobjects)
+	local objects = map.objects
 	for id, object in pairs(discardedobjects) do
-		Object.setLayer(object, nil)
+		Object_setLayer(object, nil)
 
 		if object.body then
 			-- Body:destroy sends endContact,
@@ -255,7 +301,7 @@ function Map.cleanupObjects(map, discardedobjects)
 			object.body:destroy()
 		end
 
-		map.objects[id] = nil
+		objects[id] = nil
 	end
 end
 
@@ -268,9 +314,10 @@ end
 local VisibleFixtures = {}
 
 function Map.draw(map, camera, scripts, world)
-	if map.canvas then
-		love.graphics.setCanvas(map.canvas)
-		love.graphics.clear(0, 0, 0, 1, map.canvas)
+	local canvas = map.canvas
+	if canvas then
+		love_graphics_setCanvas(canvas)
+		love_graphics_clear(0, 0, 0, 1, canvas)
 	end
 
 	local cx, cy = camera.x, camera.y
@@ -278,53 +325,53 @@ function Map.draw(map, camera, scripts, world)
 	local ccx, ccy = cx+cw*.5, cy+ch*.5
 
 	local scale = camera.scale
-	local intscale = math.floor(scale)
+	local intscale = math_floor(scale)
 
-	love.graphics.push()
-	--love.graphics.scale(intscale, intscale)
-	--love.graphics.translate(-cx, -cy)
-	love.graphics.translate(-math.floor(cx * intscale),
-				-math.floor(cy * intscale))
+	love_graphics_push()
+	--love_graphics_scale(intscale, intscale)
+	--love_graphics_translate(-cx, -cy)
+	love_graphics_translate(-math_floor(cx * intscale),
+				-math_floor(cy * intscale))
 
 	if scripts then
-		scripts:send(map.name, "beginDraw")
+		Scripts_send(scripts, map.name, "beginDraw")
 	end
 	for _, layer in ipairs(map.layers) do
 		if layer.visible and layer.opacity > 0 then
 			if scripts then
-				scripts:send(layer.name, "beginDraw")
+				Scripts_send(scripts, layer.name, "beginDraw")
 			end
 
-			love.graphics.push()
-			love.graphics.translate(
-				math.floor(layer.offsetx*intscale),
-				math.floor(layer.offsety*intscale))
-			love.graphics.scale(intscale, intscale)
+			love_graphics_push()
+			love_graphics_translate(
+				math_floor(layer.offsetx*intscale),
+				math_floor(layer.offsety*intscale))
+			love_graphics_scale(intscale, intscale)
 
-			local r,g,b,a = love.graphics.getColor()
-			love.graphics.setColor(r, g, b, a * layer.opacity)
+			local r,g,b,a = love_graphics_getColor()
+			love_graphics_setColor(r, g, b, a * layer.opacity)
 
 			if scripts then
-				scripts:send(layer.name, "drawUnder")
+				Scripts_send(scripts, layer.name, "drawUnder")
 			end
 
 			layer:draw(map, camera, scripts)
 
 			if scripts then
-				scripts:send(layer.name, "drawOver")
+				Scripts_send(scripts, layer.name, "drawOver")
 			end
 
-			love.graphics.setColor(r,g,b,a)
+			love_graphics_setColor(r,g,b,a)
 
-			love.graphics.pop()
+			love_graphics_pop()
 
 			if scripts then
-				scripts:send(layer.name, "endDraw")
+				Scripts_send(scripts, layer.name, "endDraw")
 			end
 		end
 	end
 	if scripts then
-		scripts:send(map.name, "endDraw")
+		Scripts_send(scripts, map.name, "endDraw")
 	end
 
 	if world then
@@ -334,31 +381,31 @@ function Map.draw(map, camera, scripts, world)
 				return true
 			end)
 
-		love.graphics.scale(intscale, intscale)
+		love_graphics_scale(intscale, intscale)
 
 		for _, fixture in ipairs(VisibleFixtures) do
 			local body = fixture:getBody()
-			love.graphics.circle("line", body:getX(), body:getY(),
+			love_graphics_circle("line", body:getX(), body:getY(),
 						intscale)
 
 			local bodycx, bodycy = body:getWorldCenter()
-			love.graphics.line(bodycx - intscale, bodycy,
+			love_graphics_line(bodycx - intscale, bodycy,
 					bodycx + intscale, bodycy)
-			love.graphics.line(bodycx, bodycy - intscale,
+			love_graphics_line(bodycx, bodycy - intscale,
 					bodycx, bodycy + intscale)
 
 			local shape = fixture:getShape()
 			if shape:getType() == "circle" then
 				local x, y = body:getWorldPoint(
 					shape:getPoint())
-				love.graphics.circle("line", x, y,
+				love_graphics_circle("line", x, y,
 					shape:getRadius())
-				love.graphics.points(x, y)
+				love_graphics_points(x, y)
 			elseif shape:getType() == "polygon" then
-				love.graphics.polygon("line",
+				love_graphics_polygon("line",
 					body:getWorldPoints(shape:getPoints()))
 			elseif shape:getType() == "chain" then
-				love.graphics.line(
+				love_graphics_line(
 					body:getWorldPoints(shape:getPoints()))
 			end
 		end
@@ -368,24 +415,24 @@ function Map.draw(map, camera, scripts, world)
 		end
 	end
 
-	love.graphics.pop()
+	love_graphics_pop()
 
-	if map.canvas then
-		love.graphics.setCanvas()
+	if canvas then
+		love_graphics_setCanvas()
 		local canvasscale = scale / intscale
-		love.graphics.draw(map.canvas,
-					love.graphics.getWidth()*.5,
-					love.graphics.getHeight()*.5,
+		love_graphics_draw(canvas,
+					love_graphics_getWidth()*.5,
+					love_graphics_getHeight()*.5,
 					prefs.rotation,
 					canvasscale, canvasscale,
-					map.canvas:getWidth()*.5,
-					map.canvas:getHeight()*.5)
+					canvas:getWidth()*.5,
+					canvas:getHeight()*.5)
 	end
 end
 
 local function initTileset(tileset, tiles)
 	tileset.tilecolumns =
-		math.floor(tileset.imagewidth / tileset.tilewidth)
+		math_floor(tileset.imagewidth / tileset.tilewidth)
 
 	tileset.namedtiles = {}
 	tileset.namedrows = {}
@@ -395,20 +442,20 @@ local function initTileset(tileset, tiles)
 	--tileset.tilenames = {}
 
 	for p, v in pairs(tileset.properties) do
-		if string.find(p, "rowname") == 1 then
-			local num = tonumber(string.sub(p, 8))
+		if string_find(p, "rowname") == 1 then
+			local num = tonumber(string_sub(p, 8))
 			tileset.rownames[num] = v
 			tileset.namedrows[v] = num
-		elseif string.find(p, "colname") == 1 then
-			local num = tonumber(string.sub(p, 8))
+		elseif string_find(p, "colname") == 1 then
+			local num = tonumber(string_sub(p, 8))
 			tileset.columnnames[num] = v
 			tileset.namedcols[v] = num
-		elseif string.find(p, "row_") == 1 then
-			local name = string.sub(p, 5)
+		elseif string_find(p, "row_") == 1 then
+			local name = string_sub(p, 5)
 			tileset.rownames[v] = name
 			tileset.namedrows[name] = v
-		elseif string.find(p, "column_") == 1 then
-			local name = string.sub(p, 8)
+		elseif string_find(p, "column_") == 1 then
+			local name = string_sub(p, 8)
 			tileset.columnnames[v] = name
 			tileset.namedcols[name] = v
 		end
@@ -472,8 +519,9 @@ local function initTileset(tileset, tiles)
 end
 
 function Map.initScripts(map, scripts)
-	for i = 1, #map.layers do
-		local layer = map.layers[i]
+	local layers = map.layers
+	for i = 1, #layers do
+		local layer = layers[i]
 
 		if layer.objects then
 			for _, object in pairs(layer.objects) do
@@ -486,7 +534,7 @@ function Map.initScripts(map, scripts)
 			if layer.type == "dynamiclayer"
 			and not map.properties.delayinitobjects then
 				for _, object in pairs(layer.objects) do
-					Object.init(object, layer, map)
+					Object_init(object, layer, map)
 				end
 			end
 		end
@@ -498,25 +546,25 @@ function Map.initScripts(map, scripts)
 
 	if not map.properties.delayinitobjects then
 		for _, object in pairs(map.objects) do
-			scripts:send(object.id, "initQuery")
+			Scripts_send(scripts, object.id, "initQuery")
 		end
-		for i = 1, #map.layers do
-			scripts:send(map.layers[i].name, "initQuery")
+		for i = 1, #layers do
+			Scripts_send(scripts, layers[i].name, "initQuery")
 		end
-		scripts:send(map.name, "initQuery")
+		Scripts_send(scripts, map.name, "initQuery")
 	end
 end
 
 function Map.windowResized(map, w, h, camera)
 	camera:updateScale()
-	local intscale = math.floor(camera.scale)
+	local intscale = math_floor(camera.scale)
 	map:resize(camera.w * intscale, camera.h * intscale)
 	map.canvas:setFilter("linear", "linear")
 end
 
 local function incIdProperties(properties, incid)
 	for pn, pv in pairs(properties) do
-		if type(pv) == "number" and pn:sub(-2) == "id" then
+		if type(pv) == "number" and string_sub(pn, -2) == "id" then
 			properties[pn] = pv + incid
 		end
 	end
@@ -583,7 +631,7 @@ local function mergeMaps(map1, map2)
 
 			local compression = layer2.compression
 			if compression == "zlib" or compression == "gzip" then
-				fd = love.math.decompress(fd, compression)
+				fd = love_math_decompress(fd, compression)
 			end
 
 			data = utils.get_decompressed_data(fd)
@@ -605,8 +653,9 @@ local function mergeMaps(map1, map2)
 end
 
 function Map.loadFonts(map, fonts)
-	for l = 1, #map.layers do
-		local objects = map.layers[l].objects
+	local layers = map.layers
+	for l = 1, #layers do
+		local objects = layers[l].objects
 		if objects then
 			for _, object in pairs(objects) do
 				local textfont = object.properties.textfont
@@ -643,40 +692,44 @@ local function newMap(mapfile)
 
 	local map = sti(map1, {"box2d"})
 	for fname, f in pairs(Map) do
-		map[fname] = f
+		if fname ~= "__call" then
+			map[fname] = f
+		end
 	end
 
 	map.name = mapfile
 	map.paused = false
 
-	map.objecttypes = maputil.loadObjectTypesFile("objecttypes.xml")
+	local tiles = map.tiles
 
-	if map.objecttypes then
+	local objecttypes = maputil.loadObjectTypesFile("objecttypes.xml")
+	map.objecttypes = objecttypes
+
+	if objecttypes then
 		maputil.setObjectTypesBases(map.objecttypes)
 
 		for _, layer in ipairs(map.layers) do
 			if layer.objects then
-				maputil.setObjectsDefaultProperties(
-					layer.objects, map.objecttypes)
+				maputil_setObjectsDefaultProperties(
+					layer.objects, objecttypes)
 			end
 		end
 
-		for t, properties in pairs(map.objecttypes) do
+		for t, properties in pairs(objecttypes) do
 			for k, v in pairs(properties) do
-				if k:sub(-2) == "id"
+				if string_sub(k, -2) == "id"
 				and (v == 0 or v == "") then
 					properties[k] = nil
 				end
 			end
 		end
 
-		local tiles = map.tiles
 		for i = 1, #tiles do
 			local tile = tiles[i]
 			local objectgroup = tile.objectGroup
 			if objectgroup then
-				maputil.setObjectsDefaultProperties(
-					objectgroup.objects, map.objecttypes)
+				maputil_setObjectsDefaultProperties(
+					objectgroup.objects, objecttypes)
 			end
 		end
 	end
@@ -684,24 +737,27 @@ local function newMap(mapfile)
 	local width = map.width * map.tilewidth
 	local height = map.height * map.tileheight
 
+	local tilesets = map.tilesets
 	for _, tileset in ipairs(map.tilesets) do
-		map.tilesets[tileset.name] = tileset
-		initTileset(tileset, map.tiles)
+		tilesets[tileset.name] = tileset
+		initTileset(tileset, tiles)
 	end
 
-	setmetatable(map.tiles, {
+	setmetatable(tiles, {
 		__index = function(tiles, gid)
 			error("There is no tile with gid "..gid
 				.." (out of "..#tiles.." tiles)")
 		end
 	})
 
+	local setObjectCoordinates = map.setObjectCoordinates
+	local objects = map.objects
 	for _, layer in ipairs(map.layers) do
 		if layer.type == "dynamiclayer" then
-			map:setObjectCoordinates(layer)
-			Layer.init(layer)
+			setObjectCoordinates(map, layer)
+			Layer_init(layer)
 			for _, object in pairs(layer.objects) do
-				map.objects[object.id] = object
+				objects[object.id] = object
 			end
 		elseif layer.type == "tilelayer" then
 			layer.draw = Layer.drawBatches

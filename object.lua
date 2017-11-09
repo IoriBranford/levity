@@ -1,6 +1,33 @@
 local levity
+
+local pairs = pairs
+local ipairs = ipairs
+local tonumber = tonumber
+
+local math_abs = math.abs
+local math_rad = math.rad
+local math_min = math.min
+local math_max = math.max
+local math_cos = math.cos
+local math_sin = math.sin
+
+local love_graphics_draw = love.graphics.draw
+local love_graphics_printf = love.graphics.printf
+local love_graphics_setColor = love.graphics.setColor
+local love_graphics_getColor = love.graphics.getColor
+local love_physics_newBody = love.physics.newBody
+local love_physics_newFixture = love.physics.newFixture
+
 local maputil = require "levity.maputil"
+local maputil_setObjectDefaultProperties = maputil.setObjectDefaultProperties
+
+local scripting = require "levity.scripting"
+local Scripts_send = scripting.newMachine.send
+local Scripts_newScript = scripting.newMachine.newScript
+
 local Tiles = require "levity.tiles"
+local Tiles_getGidFlip = Tiles.getGidFlip
+local Tiles_getUnflippedGid = Tiles.getUnflippedGid
 
 --- @table DynamicObject
 -- @field body
@@ -20,7 +47,7 @@ function Object.__lt(object1, object2)
 end
 
 local function addFixture(body, shape, object)
-	local fixture = love.physics.newFixture(body, shape)
+	local fixture = love_physics_newFixture(body, shape)
 	fixture:setSensor(object.properties.sensor == true)
 	fixture:setUserData({
 		id = object.id,
@@ -40,84 +67,6 @@ local function addFixture(body, shape, object)
 	return fixture
 end
 
-function Object.init(object, layer, map)
-	levity = levity or require "levity"
-	object = setmetatable(object, Object)
-
-	if object.visible == nil then
-		object.visible = true
-	end
-	object.rotation = object.rotation or 0
-	object.properties = object.properties or {}
-	if map.objecttypes then
-		maputil.setObjectDefaultProperties(object, map.objecttypes)
-	end
-
-	if not object.id then
-		object.id = map:newObjectId()
-	end
-
-	local bodytype = object.properties.static and "static" or "dynamic"
-
-	Object.setLayer(object, layer)
-
-	if object.gid then
-		object:setGid(object.gid, map, true, bodytype)
-	else
-		local angle = math.rad(object.rotation)
-		object.body = love.physics.newBody(levity.world,
-							object.x, object.y,
-							bodytype)
-		object.body:setAngle(angle)
-		local userdata = {
-			id = object.id,
-			object = object,
-			properties = object.properties
-		}
-		object.body:setUserData(userdata)
-
-		local collidable =
-			object.properties.collidable == true or
-			layer.properties.collidable == true
-
-		if collidable then
-			local shape = nil
-			if object.shape == "rectangle" then
-				shape = love.physics.newRectangleShape(
-					object.width * .5, object.height * .5,
-					object.width, object.height)
-			elseif object.shape == "ellipse" then
-				-- workaround for worldcenter always matching position
-				-- in this case, for some reason
-				local halfw, halfh = object.width*.5, object.height*.5
-				local cos = math.cos(angle)
-				local sin = math.sin(angle)
-				object.x, object.y =
-					object.x + halfw*cos - halfh*sin,
-					object.y + halfw*sin + halfh*cos
-				shape = love.physics.newCircleShape(0, 0,
-					(object.width + object.height) * .25)
-			elseif object.shape == "polyline" or object.shape == "polygon" then
-				local points = {}
-				local poly = object.polygon or object.polyline
-				for _, point in ipairs(poly) do
-					-- sti converts them to world points
-					table.insert(points, point.x - object.x)
-					table.insert(points, point.y - object.y)
-				end
-				shape = love.physics.newChainShape(object.polygon, points)
-			end
-
-			if shape then
-				addFixture(object.body, shape, object)
-			end
-		end
-	end
-
-	map.objects[object.id] = object
-	levity.scripts:newScript(object.id, object.properties.script, object)
-end
-
 local function addTileFixture(object, shapeobj, tileset)
 	local tilewidth = tileset.tilewidth
 	local tileheight = tileset.tileheight
@@ -125,7 +74,7 @@ local function addTileFixture(object, shapeobj, tileset)
 	local shapecx = shapeobj.x + shapeobj.width*.5
 	local shapecy = -tileheight + shapeobj.y + shapeobj.height*.5
 
-	local flipx, flipy = Tiles.getGidFlip(object.gid)
+	local flipx, flipy = Tiles_getGidFlip(object.gid)
 	if flipx then
 		local ox = object.tile.offset.x
 		shapecx = 2 * ox + tilewidth - shapecx
@@ -156,7 +105,7 @@ local function addTileFixture(object, shapeobj, tileset)
 end
 
 function Object.setGid(object, gid, map, animated, bodytype, applyfixtures)
-	local newtile = map.tiles[Tiles.getUnflippedGid(gid)]
+	local newtile = map.tiles[Tiles_getUnflippedGid(gid)]
 	local newtileset = map.tilesets[newtile.tileset]
 	if applyfixtures == nil then
 		applyfixtures = object.body == nil or
@@ -183,37 +132,42 @@ function Object.setGid(object, gid, map, animated, bodytype, applyfixtures)
 		object.aniframe = nil
 	end
 
-	if object.body then
+	local body = object.body
+	if body then
 		if applyfixtures then
-			for _, fixture in pairs(object.body:getFixtureList()) do
+			for _, fixture in pairs(body:getFixtureList()) do
 				fixture:destroy()
 			end
-			object.body:getUserData().fixtures = nil
+			body:getUserData().fixtures = nil
 		end
-		if bodytype and bodytype ~= object.body:getType() then
-			object.body:setType(bodytype)
+		if bodytype and bodytype ~= body:getType() then
+			body:setType(bodytype)
 		end
 	else
-		object.body = love.physics.newBody(levity.world,
+		body = love.physics.newBody(levity.world,
 						object.x, object.y, bodytype)
-		object.body:setAngle(math.rad(object.rotation))
-		object.body:setUserData({
+		body:setAngle(math_rad(object.rotation))
+		body:setUserData({
 			id = object.id,
 			object = object,
 			properties = object.properties,
 			fixtures = nil
 		})
+		object.body = body
 	end
 
 	local objectgroup = object.tile.objectGroup
 	if applyfixtures and objectgroup then
-		for i, shapeobj in ipairs(objectgroup.objects) do
+		local objects = objectgroup.objects
+		for i = 1, #objects do
+			local shapeobj = objects[i]
 			if shapeobj.properties.collidable == true then
 				addTileFixture(object, shapeobj, newtileset)
 			end
 		end
 	end
 end
+local Object_setGid = Object.setGid
 
 local function removeObject(objects, object)
 	for i, o in pairs(objects) do
@@ -247,31 +201,116 @@ function Object.setLayer(object, layer)
 	end
 	object.layer = layer
 end
+local Object_setLayer = Object.setLayer
+
+function Object.init(object, layer, map)
+	levity = levity or require "levity"
+	object = setmetatable(object, Object)
+
+	if object.visible == nil then
+		object.visible = true
+	end
+	object.rotation = object.rotation or 0
+	local properties = object.properties or {}
+	object.properties = properties
+
+	if map.objecttypes then
+		maputil_setObjectDefaultProperties(object, map.objecttypes)
+	end
+
+	local id = object.id or map:newObjectId()
+	object.id = id
+
+	local bodytype = properties.static and "static" or "dynamic"
+
+	Object_setLayer(object, layer)
+
+	if object.gid then
+		Object_setGid(object, object.gid, map, true, bodytype)
+	else
+		local angle = math_rad(object.rotation)
+		local body = love_physics_newBody(levity.world,
+							object.x, object.y,
+							bodytype)
+		object.body = body
+
+		body:setAngle(angle)
+		local userdata = {
+			id = id,
+			object = object,
+			properties = properties
+		}
+		body:setUserData(userdata)
+
+		local collidable =
+			properties.collidable == true or
+			layer.properties.collidable == true
+
+		if collidable then
+			local shape = nil
+			if object.shape == "rectangle" then
+				shape = love.physics.newRectangleShape(
+					object.width * .5, object.height * .5,
+					object.width, object.height)
+			elseif object.shape == "ellipse" then
+				-- workaround for worldcenter always matching position
+				-- in this case, for some reason
+				local halfw, halfh = object.width*.5, object.height*.5
+				local cos = math_cos(angle)
+				local sin = math_sin(angle)
+				object.x, object.y =
+					object.x + halfw*cos - halfh*sin,
+					object.y + halfw*sin + halfh*cos
+				shape = love.physics.newCircleShape(0, 0,
+					(object.width + object.height) * .25)
+			elseif object.shape == "polyline" or object.shape == "polygon" then
+				local points = {}
+				local poly = object.polygon or object.polyline
+				for _, point in ipairs(poly) do
+					-- sti converts them to world points
+					table.insert(points, point.x - object.x)
+					table.insert(points, point.y - object.y)
+				end
+				shape = love.physics.newChainShape(object.polygon, points)
+			end
+
+			if shape then
+				addFixture(body, shape, object)
+			end
+		end
+	end
+
+	map.objects[id] = object
+	Scripts_newScript(levity.scripts, id, properties.script, object)
+end
 
 function Object.updateAnimation(object, dt, map, scripts)
 	local animation = object.animation
 
 	local advanceframe = false
 	local looped = false
-	object.anitime = object.anitime + dt * 1000 * object.anitimescale
-	while object.anitime > (animation[object.aniframe].duration) do
+	local anitime = object.anitime
+	local aniframe = object.aniframe
+	anitime = anitime + dt * 1000 * object.anitimescale
+	while anitime > (animation[aniframe].duration) do
 		advanceframe = true
-		object.anitime  = object.anitime -
-		(animation[object.aniframe].duration)
-		object.aniframe = object.aniframe + 1
-		if object.aniframe > #animation then
+		anitime  = anitime - (animation[aniframe].duration)
+		aniframe = aniframe + 1
+		if aniframe > #animation then
 			looped = true
-			object.aniframe = 1
+			aniframe = 1
 		end
 	end
+	object.anitime = anitime
+	object.aniframe = aniframe
 
 	if advanceframe then
-		local tileid = (animation[object.aniframe].tileid)
+		local tileid = (animation[aniframe].tileid)
 		object.tile = map:getTile(object.tile.tileset, tileid)
 	end
 
 	if looped then
-		scripts:send(object.id, "loopedAnimation")
+		Scripts_send(scripts, object.id, "loopedAnimation")
 	end
 end
 
@@ -282,8 +321,8 @@ function Object.isOnCamera(object, camera)
 	local camcy = camera.y + camh*.5
 	local layer = object.layer
 
-	return not (math.abs(layer.offsetx + object.x - camcx) > camw
-			or math.abs(layer.offsety + object.y - camcy) > camh)
+	return not (math_abs(layer.offsetx + object.x - camcx) > camw
+			or math_abs(layer.offsety + object.y - camcy) > camh)
 end
 
 function Object.draw(object, map)
@@ -291,39 +330,42 @@ function Object.draw(object, map)
 	local top = object.y
 	local right = left + (object.width or 0)
 	local bottom = top + (object.height or 0)
-	if object.tile then
-		local tile = object.tile
+	local tile = object.tile
+	if tile then
 		local tilesets = map.tilesets
 		local tileset = tilesets[tile.tileset]
-		local x = object.x
-		local y = object.y
-		local ox = -tile.offset.x
-		local oy = -tile.offset.y + tileset.tileheight
+		local tw = tileset.tilewidth
+		local th = tileset.tileheight
+		local x = left
+		local y = top
+		local offset = tile.offset
+		local ox = -offset.x
+		local oy = -offset.y + th
 		local sx, sy = 1, 1
-		local flipx, flipy = Tiles.getGidFlip(object.gid)
+		local flipx, flipy = Tiles_getGidFlip(object.gid)
 		if flipx then
-			ox = tileset.tilewidth - ox
+			ox = tw - ox
 			sx = -1
 		end
 		if flipy then
-			oy = tileset.tileheight - oy
+			oy = th - oy
 			sy = -1
 		end
 		left = x - ox
 		top = y - oy
-		right = left + tileset.tilewidth
-		bottom = top + tileset.tileheight
+		right = left + tw
+		bottom = top + th
 
-		love.graphics.draw(tileset.image, tile.quad, x, y,
+		love_graphics_draw(tileset.image, tile.quad, x, y,
 			object.rotation, sx, sy, ox, oy)
 	elseif object.body then
 		local body = object.body
 		for j, fixture in ipairs(body:getFixtureList()) do
 			local l, t, r, b = fixture:getBoundingBox()
-			left = math.min(left, l)
-			top = math.min(top, t)
-			right = math.max(right, r)
-			bottom = math.max(bottom, b)
+			left = math_min(left, l)
+			top = math_min(top, t)
+			right = math_max(right, r)
+			bottom = math_max(bottom, b)
 
 			local shape = fixture:getShape()
 			if shape:getType() == "circle" then
@@ -343,18 +385,19 @@ function Object.draw(object, map)
 
 	local text = object.text
 	if text then
-		local textfont = object.properties.textfont
-		local textfontsize = object.properties.textfontsize
+		local properties = object.properties
+		local textfont = properties.textfont
+		local textfontsize = properties.textfontsize
 		if textfont then
 			levity = levity or require "levity" --TEMP
 			textfont = levity.fonts:use(textfont, textfontsize)
 		end
 
 		local textalign = object.halign or "left"
-		local textcolor = object.color or object.properties.textcolor
+		local textcolor = object.color or properties.textcolor
 		local r0,g0,b0,a0
 		if textcolor then
-			r0,g0,b0,a0 = love.graphics.getColor()
+			r0,g0,b0,a0 = love_graphics_getColor()
 			local a,r,g,b = 255, 255, 255, 255
 			if type(textcolor) == "string" then
 				a,r,g,b = textcolor:match("#(%x%x)(%x%x)(%x%x)(%x%x)")
@@ -363,9 +406,10 @@ function Object.draw(object, map)
 				b = tonumber("0x"..b)
 				a = tonumber("0x"..a)
 			elseif type(textcolor) == "table" then
-				r, g, b = textcolor[1], textcolor[2], textcolor[3]
+				r, g, b, a = textcolor[1], textcolor[2],
+					textcolor[3], textcolor[4] or a
 			end
-			love.graphics.setColor(r, g, b, a)
+			love_graphics_setColor(r, g, b, a)
 		end
 
 		local offsety = 0
@@ -376,11 +420,11 @@ function Object.draw(object, map)
 				offsety = offsety / 2
 			end
 		end
-		love.graphics.printf(text, left, top + offsety, right - left,
+		love_graphics_printf(text, left, top + offsety, right - left,
 					textalign)--, object.rotation)
 
 		if textcolor then
-			love.graphics.setColor(r0, g0, b0, a0)
+			love_graphics_setColor(r0, g0, b0, a0)
 		end
 	end
 end

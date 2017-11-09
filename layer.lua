@@ -1,5 +1,18 @@
+local pairs = pairs
+local table_sort = table.sort
+local table_insert = table.insert
+
+local love_graphics_draw = love.graphics.draw
+
 local Object = require "levity.object"
-local Tiles = require "levity.tiles"
+local Object_init = Object.init
+local Object_updateAnimation = Object.updateAnimation
+local Object___lt = Object.__lt
+local Object_isOnCamera = Object.isOnCamera
+local Object_draw = Object.draw
+
+local scripting = require "levity.scripting"
+local Scripts_send = scripting.newMachine.send
 
 --- @table DynamicLayer
 -- @field type "dynamiclayer"
@@ -27,20 +40,20 @@ function Layer.update(layer, dt, map, scripts)
 
 	while i0 <= i1 do
 		for i = i0, i1 do
-			Object.init(newobjects[i], layer, map)
+			Object_init(newobjects[i], layer, map)
 		end
 		for i = i0, i1 do
-			scripts:send(newobjects[i].id, "initQuery")
+			Scripts_send(scripts, newobjects[i].id, "initQuery")
 		end
 
 		i0 = i1 + 1
-		i1 = #layer.newobjects
+		i1 = #newobjects
 
 		assert(i1 <= LayerMaxNewObjects, LayerAddedTooManyObjectsMessage)
 	end
 
-	for i = #layer.newobjects, 1, -1 do
-		layer.newobjects[i] = nil
+	for i = #newobjects, 1, -1 do
+		newobjects[i] = nil
 	end
 
 	for _, object in pairs(layer.spriteobjects) do
@@ -52,12 +65,12 @@ function Layer.update(layer, dt, map, scripts)
 		end
 
 		if object.animation then
-			object:updateAnimation(dt, map, scripts)
+			Object_updateAnimation(object, dt, map, scripts)
 		end
 	end
 
 	if layer.visible and layer.draworder == "topdown" then
-		table.sort(layer.spriteobjects, Object.__lt)
+		table_sort(layer.spriteobjects, Object___lt)
 	end
 end
 
@@ -65,13 +78,14 @@ function Layer.draw(layer, map, camera, scripts)
 	local spriteobjects = layer.spriteobjects
 	for i = 1, #spriteobjects do
 		local object = spriteobjects[i]
-		if object.visible and Object.isOnCamera(object, camera) then
+		if object.visible and Object_isOnCamera(object, camera) then
+			local id = object.id
 			if scripts then
-				scripts:send(object.id, "beginDraw")
+				Scripts_send(scripts, id, "beginDraw")
 			end
-			Object.draw(object, map)
+			Object_draw(object, map)
 			if scripts then
-				scripts:send(object.id, "endDraw")
+				Scripts_send(scripts, id, "endDraw")
 			end
 		end
 	end
@@ -79,13 +93,13 @@ end
 
 function Layer.drawImage(layer, map, camera)
 	if layer.image then
-		love.graphics.draw(layer.image)
+		love_graphics_draw(layer.image)
 	end
 end
 
 function Layer.drawBatches(layer, map, camera)
 	for _, batch in pairs(layer.batches) do
-		love.graphics.draw(batch)
+		love_graphics_draw(batch)
 	end
 end
 
@@ -105,14 +119,15 @@ function Layer.init(layer)
 	-- "The behavior of next [and therefore pairs] is undefined if, during
 	-- the traversal, you assign any value to a non-existent field in the
 	-- table [i.e. a new object]."
-	layer.spriteobjects = {}
+	local spriteobjects = {}
+	layer.spriteobjects = spriteobjects
 	if layer.objects then
 		if layer.draworder == "topdown" then
-			table.sort(layer.objects, Object.__lt)
+			table_sort(layer.objects, Object___lt)
 		end
 		for _, object in pairs(layer.objects) do
 			if object.gid or object.text then
-				table.insert(layer.spriteobjects, object)
+				table_insert(spriteobjects, object)
 			end
 			object.layer = layer
 		end

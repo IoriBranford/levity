@@ -6,13 +6,33 @@ love.filesystem.setRequirePath(
 require("pl.strict").module("_G", _G)
 class = require "pl.class"
 
+local collectgarbage = collectgarbage
+
+local love_graphics_getFont = love.graphics.getFont
+local love_graphics_setNewFont = love.graphics.setNewFont
+local love_graphics_clear = love.graphics.clear
+local love_graphics_printf = love.graphics.printf
+local love_graphics_getWidth = love.graphics.getWidth
+local love_graphics_getHeight = love.graphics.getHeight
+
 local audio = require "levity.audio"
+local Bank_update = audio.newBank.update
+
 local text = require "levity.text"
 local stats = require "levity.stats"
+
 local scripting = require "levity.scripting"
+local Scripts_broadcast = scripting.newMachine.broadcast
+local Scripts_send = scripting.newMachine.send
+local Scripts_destroyIdScripts = scripting.newMachine.destroyIdScripts
+local Scripts_clearLogs = scripting.newMachine.clearLogs
+local Scripts_printLogs = scripting.newMachine.printLogs
+
 local sti = require "levity.sti.sti"
 
 local Map = require "levity.map"
+
+local profile -- = require "levity.profile"
 
 require "levity.xcoroutine"
 require "levity.xmath"
@@ -39,47 +59,44 @@ require "levity.xmath"
 local levity = {
 	prefs = require "levity.prefs"
 }
+local levity_scripts
 
 function levity:setNextMap(nextmapfile, nextmapdata)
 	self.nextmapfile = nextmapfile
 	self.nextmapdata = nextmapdata
 end
 
-local function collisionEvent(scripts, event, fixture, ...)
+local function collisionEvent(event, fixture, ...)
 	local ud = fixture:getBody():getUserData()
-	if ud then
-		local id = ud.id
-		if id then
-			scripts:send(id, event, fixture, ...)
-		end
+	local id = ud and ud.id
+	if id then
+		Scripts_send(levity_scripts, id, event, fixture, ...)
 	end
 end
 
 local function initPhysics(self)
 	self.world = love.physics.newWorld(0, self.map.properties.gravity or 0)
 
-	local scripts = self.scripts
-
 	local function beginContact(fixture1, fixture2, contact)
-		collisionEvent(scripts, "beginContact", fixture1, fixture2, contact)
-		collisionEvent(scripts, "beginContact", fixture2, fixture1, contact)
+		collisionEvent("beginContact", fixture1, fixture2, contact)
+		collisionEvent("beginContact", fixture2, fixture1, contact)
 	end
 
 	local function endContact(fixture1, fixture2, contact)
-		collisionEvent(scripts, "endContact", fixture1, fixture2, contact)
-		collisionEvent(scripts, "endContact", fixture2, fixture1, contact)
+		collisionEvent("endContact", fixture1, fixture2, contact)
+		collisionEvent("endContact", fixture2, fixture1, contact)
 	end
 
 	local function preSolve(fixture1, fixture2, contact)
-		collisionEvent(scripts, "preSolve", fixture1, fixture2, contact)
-		collisionEvent(scripts, "preSolve", fixture2, fixture1, contact)
+		collisionEvent("preSolve", fixture1, fixture2, contact)
+		collisionEvent("preSolve", fixture2, fixture1, contact)
 	end
 
 	local function postSolve(fixture1, fixture2, contact,
 				normal1, tangent1, normal2, tangent2)
-		collisionEvent(scripts, "postSolve", fixture1, fixture2, contact,
+		collisionEvent("postSolve", fixture1, fixture2, contact,
 				normal1, tangent1, normal2, tangent2)
-		collisionEvent(scripts, "postSolve", fixture2, fixture1, contact,
+		collisionEvent("postSolve", fixture2, fixture1, contact,
 				normal1, tangent1, normal2, tangent2)
 	end
 
@@ -119,8 +136,8 @@ local function camera_updateScale(camera)
 	local r = levity.prefs.rotation
 	local cosr = math.abs(math.cos(r))
 	local sinr = math.abs(math.sin(r))
-	local gw = love.graphics.getWidth()
-	local gh = love.graphics.getHeight()
+	local gw = love_graphics_getWidth()
+	local gh = love_graphics_getHeight()
 	local sw = gw*cosr + gh*sinr
 	local sh = gh*cosr + gw*sinr
 	camera.scale = math.min(sw/camera.w, sh/camera.h)
@@ -170,7 +187,7 @@ function levity:loadNextMap()
 	self.discardedobjects = {}
 	self.camera = {
 		x = 0, y = 0,
-		w = love.graphics.getWidth(), h = love.graphics.getHeight(),
+		w = love_graphics_getWidth(), h = love.graphics.getHeight(),
 		scale = 1,
 		r = 0,
 		set = camera_set,
@@ -184,14 +201,15 @@ function levity:loadNextMap()
 	self.map:loadFonts(self.fonts)
 	self.map:loadSounds(self.bank)
 	self.scripts = scripting.newMachine()
+	levity_scripts = self.scripts
 
 	initPhysics(self)
 
 	scripting.beginScriptLoading()
-	self.map:initScripts(self.scripts)
+	self.map:initScripts(levity_scripts)
 
-	self.map:windowResized(love.graphics.getWidth(),
-				love.graphics.getHeight(), self.camera)
+	self.map:windowResized(love_graphics_getWidth(),
+				love_graphics_getHeight(), self.camera)
 	-- After initScripts because script is where camera size is set.
 
 	self.maxdt = 1/16
@@ -201,85 +219,24 @@ function levity:loadNextMap()
 	collectgarbage()
 end
 
-function levity:update(dt)
-	dt = math.min(dt, self.maxdt)
-	--dt = dt*self.timescale
-
-	while self.movetimer <= 0 do
-		self.scripts:clearLogs()
-
-		local movedt = self.movedt * self.timescale
-		if self.map.paused then
-		else
-			self.scripts:broadcast("beginMove", movedt)
-			self.world:update(movedt)
-			self.scripts:broadcast("endMove", movedt)
-			self.map:update(movedt, self.scripts)
-		end
-
-		self.scripts:printLogs()
-
-		self:cleanupObjects(self.discardedobjects)
-
-		if self.map.paused then
-			self.bank:update(0)
-		else
-			self.bank:update(movedt)
-		end
-
-		self.movetimer = self.movetimer + self.movedt
-	end
-
-	collectgarbage("step", 1)
-
-	if self.prefs.drawstats then
-		self.stats:update(dt)
-	end
-
-	self.movetimer = self.movetimer - dt
-end
-
 function levity:discardObject(id)
 	self.discardedobjects[id] = self.map.objects[id]
 end
 
 function levity:cleanupObjects(discardedobjects)
-	local scripts = self.scripts
-
 	self.map:cleanupObjects(discardedobjects)
 
 	for id, _ in pairs(discardedobjects) do
-		scripts:destroyIdScripts(id)
+		Scripts_destroyIdScripts(levity_scripts, id)
 		discardedobjects[id] = nil
 	end
 end
-
-function levity:draw()
-	love.graphics.clear(0, 0, 0)
-	if self.nextmapfile then
-		return
-	end
-
-	self.map:draw(self.camera, self.scripts,
-		self.prefs.drawbodies and self.world)
-
-	if self.prefs.drawstats then
-		self.stats:draw()
-	end
-
-	if self.version then
-		local font = love.graphics.getFont()
-		local gw = love.graphics.getWidth()
-		local gh = love.graphics.getHeight()
-		local y = gh - font:getHeight()
-		love.graphics.printf(self.version, 0, y, gw, "right")
-	end
-end
+local levity_cleanupObjects = levity.cleanupObjects
 
 function levity:screenToCamera(x, y)
 	local scale = self.camera.scale
-	return	(x - love.graphics.getWidth() *.5)/scale + self.camera.w*.5,
-		(y - love.graphics.getHeight()*.5)/scale + self.camera.h*.5
+	return	(x - love_graphics_getWidth() *.5)/scale + self.camera.w*.5,
+		(y - love_graphics_getHeight()*.5)/scale + self.camera.h*.5
 end
 
 function levity:timerCorrectRoundingError(timer, time)
@@ -308,6 +265,11 @@ local Usage = {
 }
 
 function love.load()
+	if profile then
+		profile.hookall("Lua")
+		profile.start()
+	end
+
 	local version, err = love.filesystem.read("version")
 	levity.version = version and ("ver "..version)
 
@@ -347,7 +309,7 @@ function love.load()
 	prefs.drawbodies = args.drawbodies
 	prefs.drawstats = args.drawstats
 
-	love.graphics.setNewFont(18)
+	love_graphics_setNewFont(18)
 	love.physics.setMeter(64)
 
 	love.joystick.loadGamepadMappings("levity/gamecontrollerdb.txt")
@@ -355,78 +317,78 @@ function love.load()
 end
 
 function love.keypressed(key, u)
-	levity.scripts:broadcast("keypressed", key, u)
-	levity.scripts:broadcast("keypressed_"..key, u)
+	Scripts_broadcast(levity_scripts, "keypressed", key, u)
+	Scripts_broadcast(levity_scripts, "keypressed_"..key, u)
 end
 
 function love.keyreleased(key, u)
-	levity.scripts:broadcast("keyreleased", key, u)
-	levity.scripts:broadcast("keyreleased_"..key, u)
+	Scripts_broadcast(levity_scripts, "keyreleased", key, u)
+	Scripts_broadcast(levity_scripts, "keyreleased_"..key, u)
 end
 
 function love.touchpressed(touch, x, y, dx, dy, pressure)
-	levity.scripts:broadcast("touchpressed", touch, x, y)
+	Scripts_broadcast(levity_scripts, "touchpressed", touch, x, y)
 end
 
 function love.touchmoved(touch, x, y, dx, dy, pressure)
-	levity.scripts:broadcast("touchmoved", touch, x, y, dx, dy)
+	Scripts_broadcast(levity_scripts, "touchmoved", touch, x, y, dx, dy)
 end
 
 function love.touchreleased(touch, x, y, dx, dy, pressure)
-	levity.scripts:broadcast("touchreleased", touch, x, y, dx, dy)
+	Scripts_broadcast(levity_scripts, "touchreleased", touch, x, y, dx, dy)
 end
 
 function love.joystickaxis(joystick, axis, value)
-	levity.scripts:broadcast("joystickaxis", joystick, axis, value)
+	Scripts_broadcast(levity_scripts, "joystickaxis", joystick, axis, value)
 end
 
 function love.joystickhat(joystick, hat, value)
-	levity.scripts:broadcast("joystickhat", joystick, hat, value)
+	Scripts_broadcast(levity_scripts, "joystickhat", joystick, hat, value)
 end
 
 function love.joystickpressed(joystick, button)
-	levity.scripts:broadcast("joystickpressed", joystick, button)
+	Scripts_broadcast(levity_scripts, "joystickpressed", joystick, button)
 end
 
 function love.joystickreleased(joystick, button)
-	levity.scripts:broadcast("joystickreleased", joystick, button)
+	Scripts_broadcast(levity_scripts, "joystickreleased", joystick, button)
 end
 
 function love.gamepadaxis(joystick, axis, value)
-	levity.scripts:broadcast("gamepadaxis", joystick, axis, value)
+	Scripts_broadcast(levity_scripts, "gamepadaxis", joystick, axis, value)
 end
 
 function love.gamepadpressed(joystick, button)
-	levity.scripts:broadcast("gamepadpressed", joystick, button)
+	Scripts_broadcast(levity_scripts, "gamepadpressed", joystick, button)
 end
 
 function love.gamepadreleased(joystick, button)
-	levity.scripts:broadcast("gamepadreleased", joystick, button)
+	Scripts_broadcast(levity_scripts, "gamepadreleased", joystick, button)
 end
 
 function love.mousepressed(x, y, button, istouch)
 	if istouch then
 		return
 	end
-	levity.scripts:broadcast("mousepressed", x, y, button, istouch)
+	Scripts_broadcast(levity_scripts, "mousepressed", x, y, button, istouch)
 end
 
 function love.mousemoved(x, y, dx, dy, istouch)
 	if istouch then
 		return
 	end
-	levity.scripts:broadcast("mousemoved", x, y, dx, dy)
+	Scripts_broadcast(levity_scripts, "mousemoved", x, y, dx, dy)
 end
 
 function love.mousereleased(x, y, button, istouch)
 	if istouch then
 		return
 	end
-	levity.scripts:broadcast("mousereleased", x, y, button, istouch)
+	Scripts_broadcast(levity_scripts, "mousereleased", x, y, button, istouch)
 end
 
 function love.wheelmoved(x, y)
-	levity.scripts:broadcast("wheelmoved", x, y)
+	Scripts_broadcast(levity_scripts, "wheelmoved", x, y)
 end
 
 function love.resize(w, h)
@@ -434,20 +396,83 @@ function love.resize(w, h)
 end
 
 function love.update(dt)
-	levity:update(dt)
+	local map = levity.map
+	local bank = levity.bank
+	local world = levity.world
+	local movedt = levity.movedt
+	local timescale = levity.timescale
+	local discardedobjects = levity.discardedobjects
+
+	local movetimer = levity.movetimer
+	while movetimer <= 0 do
+		Scripts_clearLogs(levity_scripts)
+
+		local movedt = movedt * timescale
+		if map.paused then
+		else
+			Scripts_broadcast(levity_scripts, "beginMove", movedt)
+			world:update(movedt)
+			Scripts_broadcast(levity_scripts, "endMove", movedt)
+			map:update(movedt, levity_scripts)
+		end
+
+		Scripts_printLogs(levity_scripts)
+
+		levity_cleanupObjects(levity, discardedobjects)
+
+		if map.paused then
+			Bank_update(bank, 0)
+		else
+			Bank_update(bank, movedt)
+		end
+
+		movetimer = movetimer + movedt
+	end
+
+	collectgarbage("step", 1)
+
+	if levity.prefs.drawstats then
+		levity.stats:update(dt)
+	end
+
+	dt = math.min(dt, levity.maxdt)
+
+	movetimer = movetimer - dt
+	levity.movetimer = movetimer
 
 	if levity.nextmapfile then
-		levity.scripts:broadcast("nextMap",
+		Scripts_broadcast(levity_scripts, "nextMap",
 			levity.nextmapfile, levity.nextmapdata)
 		levity:loadNextMap()
 	end
 end
 
 function love.draw()
-	levity:draw()
+	love_graphics_clear(0, 0, 0)
+	if levity.nextmapfile then
+		return
+	end
+
+	levity.map:draw(levity.camera, levity_scripts,
+		levity.prefs.drawbodies and levity.world)
+
+	if levity.prefs.drawstats then
+		levity.stats:draw()
+	end
+
+	if levity.version then
+		local font = love_graphics_getFont()
+		local gw = love_graphics_getWidth()
+		local gh = love_graphics_getHeight()
+		local y = gh - font:getHeight()
+		love_graphics_printf(levity.version, 0, y, gw, "right")
+	end
 end
 
 function love.quit()
+	if profile then
+		love.filesystem.write("profile.txt", profile.report("time", 50))
+	end
 end
 
 return levity
